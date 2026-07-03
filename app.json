@@ -1,0 +1,48 @@
+{
+  "expo": {
+    "name": "Stop AD",
+    "slug": "stop-ad",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "stopad",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "bundleIdentifier": "com.ilyadylko.StopAD",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#141414"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "com.ilyadylko.StopAD"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff"
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#141414"
+        }
+      ],
+      "expo-font",
+      "expo-status-bar",
+      "expo-image",
+      "@react-native-community/datetimepicker",
+      "expo-sharing"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}
