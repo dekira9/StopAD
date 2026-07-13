@@ -72,7 +72,7 @@ function durationMinutes(from: string, to: string): number | null {
   if (fromMinutes === null || toMinutes === null) return null;
 
   let diff = toMinutes - fromMinutes;
-  if (diff <= 0) diff += 24 * 60;
+  if (diff < 0) diff += 24 * 60;
   return diff;
 }
 

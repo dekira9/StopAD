@@ -1,31 +1,37 @@
 {
   "expo": {
-    "name": "Stop AD",
-    "slug": "stop-ad",
+    "name": "Hi, Anxiety",
+    "slug": "hi-anxiety",
     "version": "1.0.0",
     "orientation": "portrait",
-    "scheme": "stopad",
+    "icon": "./assets/images/icon.png",
+    "scheme": "hianxiety",
     "userInterfaceStyle": "automatic",
+    "backgroundColor": "#F8FAF8",
     "ios": {
-      "bundleIdentifier": "com.ilyadylko.StopAD",
+      "bundleIdentifier": "com.ilyadylko.HiAnxiety",
+      "backgroundColor": "#F8FAF8",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#141414"
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundColor": "#6B9080"
       },
+      "backgroundColor": "#F8FAF8",
       "predictiveBackGestureEnabled": false,
-      "package": "com.ilyadylko.StopAD"
+      "package": "com.ilyadylko.HiAnxiety"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
+          "image": "./assets/images/splash-icon.png",
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
+          "backgroundColor": "#6B9080"
         }
       ],
       [
@@ -34,11 +40,18 @@
           "color": "#141414"
         }
       ],
+      [
+        "expo-navigation-bar",
+        {
+          "enforceContrast": false
+        }
+      ],
       "expo-font",
       "expo-status-bar",
       "expo-image",
       "@react-native-community/datetimepicker",
-      "expo-sharing"
+      "expo-sharing",
+      "expo-audio"
     ],
     "experiments": {
       "typedRoutes": true,

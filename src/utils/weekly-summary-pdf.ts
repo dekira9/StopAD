@@ -96,7 +96,7 @@ export function buildWeeklySummaryHtml({
 }: ExportOptions): string {
   const entries = buildWeeklySummaryEntries(weekDays, days, locale, language);
   const maxPanic = getWeeklySummaryMaxPanic(entries);
-  const triggerCounts = buildWeeklyTriggerCounts(entries);
+  const triggerCounts = buildWeeklyTriggerCounts(entries, language);
   const weekRange = formatWeekRange(weekDays, locale);
   const noData = labels.weeklyNoData;
 

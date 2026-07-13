@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { formatTimeValue, MedicationTimePickerModal, parseTimeValue } from '@/components/medication-time-picker-modal';
 import type { AppLabels } from '@/constants/i18n';
-import { Fonts } from '@/constants/theme';
+import { daySectionLabelStyle, formatSectionTitle, weekBodyTextStyle, weekServiceTextStyle } from '@/constants/typography';
 import {
   calculateSleepTotalMinutes,
   createSleepAwakening,
@@ -41,6 +41,7 @@ type Props = {
   labels: AppLabels;
   theme: ThemeSlice;
   onChange: (value: string) => void;
+  onOpenNightObservation?: () => void;
 };
 
 function formatDisplayTime(time: string): string {
@@ -48,7 +49,7 @@ function formatDisplayTime(time: string): string {
   return formatTimeValue(parseTimeValue(time));
 }
 
-export function SleepInput({ label, value, labels, theme, onChange }: Props) {
+export function SleepInput({ label, value, labels, theme, onChange, onOpenNightObservation }: Props) {
   const log = useMemo(() => parseSleepLog(value), [value]);
   const [pickerTarget, setPickerTarget] = useState<PickerTarget | null>(null);
 
@@ -125,7 +126,7 @@ export function SleepInput({ label, value, labels, theme, onChange }: Props) {
       {renderTimeButton(to, onToPress)}
       {onRemove ? (
         <Pressable onPress={onRemove} hitSlop={6} style={({ pressed }) => [styles.removeBtn, pressed && styles.pressed]}>
-          <Ionicons name="remove-circle" size={20} color={theme.iconMuted} />
+          <Ionicons name="remove-circle-outline" size={16} color={theme.textSecondary} />
         </Pressable>
       ) : (
         <View style={styles.removeSpacer} />
@@ -135,9 +136,9 @@ export function SleepInput({ label, value, labels, theme, onChange }: Props) {
 
   return (
     <>
-      <View style={[styles.sectionBlock, { borderColor: theme.rowBorder }]}>
-        <Text style={[styles.sectionLabel, { color: theme.textSecondary, backgroundColor: theme.sectionLabelBg }]}>
-          {label}
+      <View style={styles.sectionBlock}>
+        <Text style={[styles.sectionLabel, { backgroundColor: theme.sectionLabelBg }]}>
+          {formatSectionTitle(label)}
         </Text>
 
         <View style={styles.content}>
@@ -169,8 +170,10 @@ export function SleepInput({ label, value, labels, theme, onChange }: Props) {
               { borderColor: theme.inactiveBorder, backgroundColor: theme.inactiveBg },
               pressed && styles.pressed,
             ]}>
-            <Ionicons name="add-circle-outline" size={16} color={theme.text} />
-            <Text style={[styles.addButtonText, { color: theme.inactiveText }]}>{labels.sleepAddAwakening}</Text>
+            <Ionicons name="add-circle-outline" size={16} color={theme.activeBg} />
+            <Text style={[styles.addButtonText, { color: theme.activeBg }]}>
+              {labels.sleepAddAwakening.toLocaleLowerCase()}
+            </Text>
           </Pressable>
 
           {totalLabel ? (
@@ -179,6 +182,19 @@ export function SleepInput({ label, value, labels, theme, onChange }: Props) {
               <Text style={[styles.totalValue, { color: theme.text }]}>{totalLabel}</Text>
             </View>
           ) : null}
+
+          <Pressable
+            onPress={() => onOpenNightObservation?.()}
+            style={({ pressed }) => [
+              styles.nightObservationButton,
+              { borderColor: theme.inactiveBorder, backgroundColor: theme.inactiveBg },
+              pressed && styles.pressed,
+            ]}>
+            <Ionicons name="moon-outline" size={16} color={theme.activeBg} />
+            <Text style={[styles.nightObservationButtonText, { color: theme.activeBg }]}>
+              {labels.sleepNightObservationButton}
+            </Text>
+          </Pressable>
         </View>
       </View>
 
@@ -215,18 +231,16 @@ export function SleepInput({ label, value, labels, theme, onChange }: Props) {
 }
 
 const styles = StyleSheet.create({
-  sectionBlock: { borderBottomWidth: 1 },
+  sectionBlock: {},
   sectionLabel: {
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 2,
-    textTransform: 'uppercase',
+    ...daySectionLabelStyle,
     paddingHorizontal: 16,
     paddingTop: 10,
     paddingBottom: 6,
   },
   content: {
     paddingHorizontal: 16,
+    paddingTop: 10,
     paddingBottom: 12,
     gap: 8,
   },
@@ -236,8 +250,8 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   intervalLabel: {
-    fontSize: 11,
-    fontWeight: '700',
+    ...weekServiceTextStyle,
+    letterSpacing: 0,
     minWidth: 18,
   },
   timeButton: {
@@ -249,9 +263,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   timeButtonText: {
-    fontSize: 12,
-    fontFamily: Fonts.mono,
-    fontWeight: '700',
+    ...weekBodyTextStyle,
   },
   removeBtn: {
     width: 24,
@@ -265,10 +277,7 @@ const styles = StyleSheet.create({
   },
   subheading: {
     marginTop: 4,
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
+    ...weekServiceTextStyle,
   },
   addButton: {
     flexDirection: 'row',
@@ -282,9 +291,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   addButtonText: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.4,
+    ...weekBodyTextStyle,
   },
   totalRow: {
     marginTop: 4,
@@ -298,15 +305,25 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   totalLabel: {
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
+    ...weekServiceTextStyle,
   },
   totalValue: {
-    fontSize: 14,
-    fontFamily: Fonts.mono,
-    fontWeight: '800',
+    ...weekBodyTextStyle,
+  },
+  nightObservationButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    marginTop: 4,
+  },
+  nightObservationButtonText: {
+    ...weekBodyTextStyle,
+    textAlign: 'center',
   },
   pressed: { opacity: 0.7 },
 });

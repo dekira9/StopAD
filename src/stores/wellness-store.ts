@@ -1,4 +1,4 @@
-import { addDays, addMonths, differenceInCalendarDays, differenceInCalendarMonths, format, getDay, parse, startOfDay, startOfWeek } from 'date-fns';
+import { addDays, addMonths, differenceInCalendarDays, differenceInCalendarMonths, format, getDay, isSameDay, parse, startOfDay, startOfWeek } from 'date-fns';
 import {
   documentDirectory,
   getInfoAsync,
@@ -22,6 +22,7 @@ export type MedicationRepeatConfig = {
   everyDay: boolean;
   daysOfWeek: number[];
   intervalDays?: number;
+  intervalMonths?: number;
   startDateKey?: string;
   endDateKey?: string | null;
 };
@@ -110,6 +111,18 @@ function scoreMedicationRepeat(repeat: MedicationRepeatConfig): number {
 }
 
 function medicationRepeatMatchesDay(date: Date, anchorDate: Date, repeat: MedicationRepeatConfig): boolean {
+  if (repeat.intervalMonths && repeat.intervalMonths >= 1) {
+    const target = startOfDay(date);
+    const start = startOfDay(anchorDate);
+    if (target < start) return false;
+
+    let cursor = start;
+    while (cursor <= target) {
+      if (isSameDay(cursor, target)) return true;
+      cursor = addMonths(cursor, repeat.intervalMonths);
+    }
+    return false;
+  }
   if (repeat.intervalDays && repeat.intervalDays >= 2) {
     const diff = differenceInCalendarDays(date, anchorDate);
     return diff >= 0 && diff % repeat.intervalDays === 0;
@@ -125,12 +138,19 @@ function normalizeMedicationRepeat(repeat?: Partial<MedicationRepeatConfig>): Me
     daysOfWeek: [...(repeat?.daysOfWeek ?? DEFAULT_MEDICATION_REPEAT.daysOfWeek)],
   };
   let normalized: MedicationRepeatConfig;
-  if (merged.intervalDays && merged.intervalDays >= 2) {
-    normalized = { ...merged, everyDay: false, daysOfWeek: [] };
+  if (merged.intervalMonths && merged.intervalMonths >= 1) {
+    normalized = { ...merged, everyDay: false, daysOfWeek: [], intervalDays: undefined };
+  } else if (merged.intervalDays && merged.intervalDays >= 2) {
+    normalized = { ...merged, everyDay: false, daysOfWeek: [], intervalMonths: undefined };
   } else if (merged.everyDay) {
-    normalized = { ...merged, intervalDays: undefined, daysOfWeek: [0, 1, 2, 3, 4, 5, 6] };
+    normalized = {
+      ...merged,
+      intervalDays: undefined,
+      intervalMonths: undefined,
+      daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+    };
   } else {
-    normalized = { ...merged, intervalDays: undefined };
+    normalized = { ...merged, intervalDays: undefined, intervalMonths: undefined };
   }
   return {
     ...normalized,
@@ -197,6 +217,10 @@ function normalizeMedicationTime(time: string): string {
 
 function medicationTimesEqual(a: string, b: string): boolean {
   return normalizeMedicationTime(a) === normalizeMedicationTime(b);
+}
+
+function medicationLabelsEqual(a: string, b: string): boolean {
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
 }
 
 function generateSafeId(dateKey: string, baseIndex: number, existing: MedicationRow[]) {
@@ -293,7 +317,7 @@ class WellnessStore {
   hydrated = false;
   private persistQueue: Promise<void> = Promise.resolve();
   private reminderLabels: ReminderLabels = {
-    notificationTitle: 'Stop AD',
+    notificationTitle: 'Hi, Anxiety',
     notificationBody: 'Time to take:',
   };
 
@@ -468,7 +492,7 @@ class WellnessStore {
   }
 
   refreshMedicationCatalog() {
-    this.syncCatalogFromDayRows();
+    this.syncCatalogFromData();
   }
 
   get visibleMedicationCatalog(): MedicationCatalogEntry[] {
@@ -499,6 +523,69 @@ class WellnessStore {
     }
 
     return rowTime || scheduleTime;
+  }
+
+  getMedicationScheduledIntakeNumber(dateKey: string, row: MedicationRow, rowIndex: number): number | null {
+    const medName = row.medication.trim();
+    if (!medName) return null;
+
+    const weekKey = format(
+      startOfWeek(parse(dateKey, 'yyyy-MM-dd', new Date()), { weekStartsOn: WEEK_STARTS_ON }),
+      'yyyy-MM-dd',
+    );
+    const schedule = this.getMedicationScheduleForName(medName, weekKey);
+    const repeat = normalizeMedicationRepeat(schedule.repeat);
+    if (!repeat.startDateKey) return null;
+
+    const rowTime = this.resolveMedicationRowTime(dateKey, row, rowIndex).trim();
+    const times =
+      schedule.times.length > 0
+        ? schedule.times
+        : rowTime
+          ? [rowTime]
+          : [];
+    if (times.length === 0) return null;
+
+    const day = this.getDay(dateKey);
+    const slotIndex = this.getMedicationTimeSlotIndex(day.medications, row.id, medName, rowIndex);
+    if (slotIndex >= times.length) return null;
+
+    const targetDate = startOfDay(parse(dateKey, 'yyyy-MM-dd', new Date()));
+    const anchor = startOfDay(getMedicationDurationStart(repeat, schedule.planWeekKey));
+
+    if (targetDate < anchor) return null;
+    if (!isWithinMedicationDuration(targetDate, repeat, schedule.planWeekKey)) return null;
+    if (!medicationRepeatMatchesDay(targetDate, anchor, repeat)) return null;
+
+    let count = 0;
+    let current = anchor;
+    const targetName = medName.toLowerCase();
+
+    while (current <= targetDate) {
+      if (
+        isWithinMedicationDuration(current, repeat, schedule.planWeekKey) &&
+        medicationRepeatMatchesDay(current, anchor, repeat)
+      ) {
+        const currentKey = format(current, 'yyyy-MM-dd');
+        const currentDay = this.getDay(currentKey);
+        const matchingRows = currentDay.medications.filter(
+          (medicationRow) => medicationRow.medication.trim().toLowerCase() === targetName,
+        );
+
+        for (let slot = 0; slot < times.length; slot++) {
+          const scheduledRow = matchingRows[slot];
+          if (scheduledRow?.taken) {
+            count += 1;
+          }
+          if (currentKey === dateKey && slot === slotIndex) {
+            return scheduledRow?.taken ? count : null;
+          }
+        }
+      }
+      current = addDays(current, 1);
+    }
+
+    return null;
   }
 
   hasMedicationInDays(medicationName: string): boolean {
@@ -687,8 +774,15 @@ class WellnessStore {
     return this.hasMedicationSchedule(label) || this.hasMedicationInDays(label);
   }
 
-  private syncCatalogFromDayRows() {
+  private syncCatalogFromData() {
     let changed = false;
+    for (const plan of Object.values(this.weekMedicationPlans)) {
+      for (const template of plan) {
+        if (this.ensureCatalogEntryForMedication(template.medication, false)) {
+          changed = true;
+        }
+      }
+    }
     for (const day of Object.values(this.days)) {
       for (const row of day.medications) {
         if (this.ensureCatalogEntryForMedication(row.medication, false)) {
@@ -823,20 +917,68 @@ class WellnessStore {
       entry.id === id ? next : entry,
     );
 
-    if (oldLabel && newLabel && oldLabel !== newLabel) {
+    if (oldLabel && newLabel && !medicationLabelsEqual(oldLabel, newLabel)) {
       this.renameMedicationLabel(oldLabel, newLabel);
     }
 
     this.schedulePersist();
   }
 
-  private renameMedicationLabel(oldLabel: string, newLabel: string) {
+  private renameMedicationInCatalog(oldLabel: string, newLabel: string) {
+    const trimmedOld = oldLabel.trim();
+    const trimmedNew = newLabel.trim();
+    if (!trimmedOld || !trimmedNew || medicationLabelsEqual(trimmedOld, trimmedNew)) return;
+
+    const { name, dose } = parseMedicationLabel(trimmedNew);
+    const hasExistingTarget = this.medicationCatalog.some((entry) => {
+      const label = formatMedicationLabel(entry.name, entry.dose);
+      return medicationLabelsEqual(label, trimmedNew) && !medicationLabelsEqual(label, trimmedOld);
+    });
+    let renamed = false;
+
+    this.medicationCatalog = this.medicationCatalog.reduce<MedicationCatalogEntry[]>((nextEntries, entry) => {
+      const label = formatMedicationLabel(entry.name, entry.dose);
+      if (!medicationLabelsEqual(label, trimmedOld)) {
+        nextEntries.push(entry);
+        return nextEntries;
+      }
+
+      if (hasExistingTarget || renamed) {
+        return nextEntries;
+      }
+
+      nextEntries.push({ ...entry, name, dose, isDraft: false });
+      renamed = true;
+      return nextEntries;
+    }, []);
+
+    if (!renamed && !hasExistingTarget) {
+      this.medicationCatalog = [
+        ...this.medicationCatalog,
+        {
+          id: `med-catalog-${Date.now()}-${this.medicationCatalog.length}`,
+          name,
+          dose,
+        },
+      ];
+    }
+  }
+
+  private renameMedicationLabel(oldLabel: string, newLabel: string, updateCatalog = false) {
+    const trimmedOld = oldLabel.trim();
+    const trimmedNew = newLabel.trim();
+    if (!trimmedOld || !trimmedNew || medicationLabelsEqual(trimmedOld, trimmedNew)) return;
+
+    if (updateCatalog) {
+      this.renameMedicationInCatalog(trimmedOld, trimmedNew);
+    }
+
     const nextDays: DayLogs = {};
     for (const [dateKey, day] of Object.entries(this.days)) {
       nextDays[dateKey] = {
         ...day,
         medications: day.medications.map((row) =>
-          row.medication.trim() === oldLabel ? { ...row, medication: newLabel } : row,
+          medicationLabelsEqual(row.medication, trimmedOld) ? { ...row, medication: trimmedNew } : row,
         ),
       };
     }
@@ -845,7 +987,7 @@ class WellnessStore {
     const nextPlans: Record<string, MedicationPlanTemplate[]> = {};
     for (const [weekKey, plan] of Object.entries(this.weekMedicationPlans)) {
       nextPlans[weekKey] = plan.map((template) =>
-        template.medication.trim() === oldLabel ? { ...template, medication: newLabel } : template,
+        medicationLabelsEqual(template.medication, trimmedOld) ? { ...template, medication: trimmedNew } : template,
       );
     }
     this.weekMedicationPlans = nextPlans;
@@ -941,8 +1083,14 @@ class WellnessStore {
     }
 
     if ('medication' in patch) {
-      this.ensureCatalogEntryForMedication(patch.medication ?? '');
-      if (previousLabel.trim() && previousLabel.trim() !== (patch.medication ?? '').trim()) {
+      const nextLabel = (patch.medication ?? '').trim();
+      const previousTrimmed = previousLabel.trim();
+      if (previousTrimmed && nextLabel && !medicationLabelsEqual(previousTrimmed, nextLabel)) {
+        this.renameMedicationLabel(previousTrimmed, nextLabel, true);
+      } else if (nextLabel) {
+        this.ensureCatalogEntryForMedication(nextLabel);
+      }
+      if (previousTrimmed && (!nextLabel || !medicationLabelsEqual(previousTrimmed, nextLabel))) {
         this.pruneMedicationCatalog();
       }
     }

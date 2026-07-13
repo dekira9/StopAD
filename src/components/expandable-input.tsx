@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View, type StyleProp, type TextInputProps, type TextStyle } from 'react-native';
 
-import { Fonts } from '@/constants/theme';
+import { weekBodyTextStyle } from '@/constants/typography';
 
 type ExpandableInputProps = {
   value: string;
@@ -15,6 +15,7 @@ type ExpandableInputProps = {
   selection?: { start: number; end: number };
   iconMuted: string;
   placeholder?: string;
+  placeholderStyle?: StyleProp<TextStyle>;
   placeholderTextColor?: string;
   color: string;
   opacity?: number;
@@ -35,6 +36,7 @@ export function ExpandableInput({
   selection,
   iconMuted,
   placeholder,
+  placeholderStyle,
   placeholderTextColor,
   color,
   opacity = 1,
@@ -46,6 +48,7 @@ export function ExpandableInput({
 }: ExpandableInputProps) {
   const [containerWidth, setContainerWidth] = useState(0);
   const [contentWidth, setContentWidth] = useState(0);
+  const [isFocused, setIsFocused] = useState(false);
 
   const canExpand = useMemo(() => {
     if (!value) return false;
@@ -69,18 +72,24 @@ export function ExpandableInput({
         <TextInput
           value={value}
           onChangeText={onChangeText}
-          onFocus={onFocus}
-          onBlur={onBlur}
           multiline={isExpanded}
           numberOfLines={isExpanded ? undefined : 1}
           scrollEnabled={isExpanded}
           textAlignVertical={isExpanded ? 'top' : 'center'}
-          selection={selection}
-          placeholder={placeholder}
+          selection={!isExpanded && !isFocused ? { start: 0, end: 0 } : selection}
+          placeholder={placeholderStyle ? undefined : placeholder}
           placeholderTextColor={placeholderTextColor}
           returnKeyType={returnKeyType}
           onSubmitEditing={onSubmitEditing}
           blurOnSubmit={blurOnSubmit}
+          onFocus={() => {
+            setIsFocused(true);
+            onFocus?.();
+          }}
+          onBlur={() => {
+            setIsFocused(false);
+            onBlur?.();
+          }}
           onContentSizeChange={(event) => {
             const nextWidth = event.nativeEvent.contentSize.width;
             if (nextWidth !== contentWidth) {
@@ -95,6 +104,25 @@ export function ExpandableInput({
             { color, opacity, textDecorationLine },
           ]}
         />
+        {placeholderStyle && !value ? (
+          <View
+            pointerEvents="none"
+            style={[
+              styles.placeholderRow,
+              !isExpanded && styles.placeholderRowCollapsed,
+              isExpanded && styles.placeholderRowExpanded,
+            ]}>
+            <Text
+              style={[
+                styles.placeholderText,
+                !isExpanded && styles.placeholderTextCollapsed,
+              placeholderStyle,
+              { color: placeholderTextColor },
+            ]}>
+              {placeholder}
+            </Text>
+          </View>
+        ) : null}
       </View>
       {showToggle ? (
         <Pressable onPress={onToggleExpand} hitSlop={6} style={({ pressed }) => [styles.expandBtn, pressed && styles.expandPressed]}>
@@ -123,11 +151,12 @@ const styles = StyleSheet.create({
     maxHeight: 20,
   },
   input: {
+    ...weekBodyTextStyle,
     width: '100%',
-    fontSize: 12,
-    fontFamily: Fonts.mono,
+    lineHeight: 20,
     paddingVertical: 0,
     paddingHorizontal: 0,
+    textAlign: 'left',
   },
   inputCollapsed: {
     maxHeight: 20,
@@ -136,6 +165,26 @@ const styles = StyleSheet.create({
     minHeight: 76,
     paddingTop: 4,
     paddingBottom: 4,
+  },
+  placeholderRow: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  placeholderRowCollapsed: {
+    top: 0,
+  },
+  placeholderRowExpanded: {
+    top: 4,
+  },
+  placeholderText: {
+    flex: 1,
+  },
+  placeholderTextCollapsed: {
+    lineHeight: 20,
   },
   expandBtn: {
     width: 18,

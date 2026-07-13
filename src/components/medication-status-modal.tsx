@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text } from 'react-native';
 
 import type { AppLabels } from '@/constants/i18n';
 

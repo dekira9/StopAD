@@ -16,11 +16,12 @@ import {
   subMonths,
 } from 'date-fns';
 import type { Locale } from 'date-fns';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { AppLabels } from '@/constants/i18n';
 import { Fonts } from '@/constants/theme';
+import { formatMonthYear } from '@/utils/date-format';
 
 type ThemeSlice = {
   text: string;
@@ -52,8 +53,9 @@ type Props = {
 
 const WEEK_STARTS_ON = 1 as const;
 
-export function MedicationDatePickerModal({
-  visible,
+type ContentProps = Omit<Props, 'visible'>;
+
+function MedicationDatePickerModalContent({
   title,
   labels,
   theme,
@@ -64,16 +66,11 @@ export function MedicationDatePickerModal({
   onClose,
   onSelect,
   onSelectNone,
-}: Props) {
+}: ContentProps) {
   const initialMonth = selectedDateKey
     ? parse(selectedDateKey, 'yyyy-MM-dd', new Date())
     : new Date();
   const [visibleMonth, setVisibleMonth] = useState(initialMonth);
-
-  useEffect(() => {
-    if (!visible) return;
-    setVisibleMonth(selectedDateKey ? parse(selectedDateKey, 'yyyy-MM-dd', new Date()) : new Date());
-  }, [visible, selectedDateKey]);
 
   const minimumDate = minimumDateKey ? parse(minimumDateKey, 'yyyy-MM-dd', new Date()) : undefined;
   const selectedDate = selectedDateKey ? parse(selectedDateKey, 'yyyy-MM-dd', new Date()) : undefined;
@@ -100,7 +97,6 @@ export function MedicationDatePickerModal({
   };
 
   return (
-    <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
       <Pressable style={[styles.overlay, { backgroundColor: theme.modalOverlay }]} onPress={onClose}>
         <Pressable
           style={[styles.card, { backgroundColor: theme.modalBg, borderColor: theme.subtlePanelBorder }]}
@@ -127,7 +123,7 @@ export function MedicationDatePickerModal({
               <Ionicons name="chevron-back" size={18} color={theme.text} />
             </Pressable>
             <Text style={[styles.monthTitle, { color: theme.text }]}>
-              {format(visibleMonth, 'LLLL yyyy', { locale })}
+              {formatMonthYear(visibleMonth, locale)}
             </Text>
             <Pressable
               onPress={() => setVisibleMonth((prev) => addMonths(prev, 1))}
@@ -211,6 +207,15 @@ export function MedicationDatePickerModal({
           ) : null}
         </Pressable>
       </Pressable>
+  );
+}
+
+export function MedicationDatePickerModal({ visible, ...contentProps }: Props) {
+  const key = contentProps.selectedDateKey ?? 'today';
+
+  return (
+    <Modal transparent visible={visible} animationType="fade" onRequestClose={contentProps.onClose}>
+      {visible ? <MedicationDatePickerModalContent key={key} {...contentProps} /> : null}
     </Modal>
   );
 }

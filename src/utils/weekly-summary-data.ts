@@ -6,7 +6,7 @@ import { getTriggerLabel } from '@/constants/trigger-labels';
 import type { DayLog } from '@/stores/wellness-store';
 import { parseMedicationLabel } from '@/stores/wellness-store';
 import { resolvePanicAttackCount } from '@/utils/panic-attack-log';
-import { calculateSleepTotalMinutes, formatSleepClock, parseSleepLog } from '@/utils/sleep-log';
+import { calculateSleepTotalMinutes, parseSleepLog } from '@/utils/sleep-log';
 import { calculateSportDayTotals, parseSportLog } from '@/utils/sport-log';
 import { parseTriggerLog } from '@/utils/trigger-log';
 
@@ -30,10 +30,36 @@ export function formatWeeklyDayLabel(day: Date, locale: Locale): string {
   return format(day, 'EEE', { locale }).replace(/\./g, '').slice(0, 2).toUpperCase();
 }
 
+function getMedicationSortMinutes(time: string): number | null {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(time.trim());
+  if (!match) return null;
+
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+
+  return hours * 60 + minutes;
+}
+
 function buildMedicationSummaries(storedDay: DayLog | undefined): MedicationSummary[] {
   if (!storedDay?.medications?.length) return [];
 
   return storedDay.medications
+    .filter((row) => row.taken)
+    .map((row, index) => ({
+      row,
+      index,
+      sortMinutes: getMedicationSortMinutes(row.time ?? ''),
+    }))
+    .sort((a, b) => {
+      if (a.sortMinutes !== null && b.sortMinutes !== null && a.sortMinutes !== b.sortMinutes) {
+        return a.sortMinutes - b.sortMinutes;
+      }
+      if (a.sortMinutes !== null && b.sortMinutes === null) return -1;
+      if (a.sortMinutes === null && b.sortMinutes !== null) return 1;
+      return a.index - b.index;
+    })
+    .map(({ row }) => row)
     .map((row) => parseMedicationLabel(row.medication))
     .filter((item) => item.name.length > 0);
 }
@@ -77,7 +103,10 @@ export type WeeklyTriggerCount = {
   count: number;
 };
 
-export function buildWeeklyTriggerCounts(entries: WeeklySummaryDayEntry[]): WeeklyTriggerCount[] {
+export function buildWeeklyTriggerCounts(
+  entries: WeeklySummaryDayEntry[],
+  language: Language,
+): WeeklyTriggerCount[] {
   const counts = new Map<string, number>();
 
   for (const entry of entries) {
@@ -90,7 +119,7 @@ export function buildWeeklyTriggerCounts(entries: WeeklySummaryDayEntry[]): Week
 
   return [...counts.entries()]
     .map(([name, count]) => ({ name, count }))
-    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'ru'));
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, language));
 }
 
 function getRussianTriggerTimesWord(count: number): string {
@@ -119,6 +148,10 @@ export function formatWeeklyTriggerLine(name: string, count: number, language: L
       return `${name} — ${count} ${count === 1 ? 'vez' : 'vezes'}`;
     case 'it':
       return `${name} — ${count} ${count === 1 ? 'volta' : 'volte'}`;
+    case 'ja':
+      return `${name} — ${count} 回`;
+    case 'ko':
+      return `${name} — ${count}회`;
     default:
       return `${name} — ${count}`;
   }

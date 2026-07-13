@@ -129,7 +129,7 @@ export function WeeklySummaryCharts({ weekDays, days, labels, locale, language, 
   );
 
   const maxPanic = useMemo(() => getWeeklySummaryMaxPanic(entries), [entries]);
-  const triggerCounts = useMemo(() => buildWeeklyTriggerCounts(entries), [entries]);
+  const triggerCounts = useMemo(() => buildWeeklyTriggerCounts(entries, language), [entries, language]);
 
   return (
     <View style={styles.wrap}>

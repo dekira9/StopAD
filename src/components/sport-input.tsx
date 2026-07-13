@@ -1,9 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import type { AppLabels } from '@/constants/i18n';
-import { Fonts } from '@/constants/theme';
+import { formatSectionTitle, daySectionLabelStyle, weekBodyTextStyle, weekServiceTextStyle } from '@/constants/typography';
 import {
   createSportActivity,
   formatSportDuration,
@@ -54,14 +54,9 @@ function parseStepsInput(value: string): number | undefined {
 }
 
 export function SportInput({ label, value, labels, theme, onChange }: Props) {
-  const [log, setLog] = useState<SportLog>(() => parseSportLog(value));
-
-  useEffect(() => {
-    setLog(parseSportLog(value));
-  }, [value]);
+  const log = useMemo(() => parseSportLog(value), [value]);
 
   const updateLog = (nextLog: SportLog) => {
-    setLog(nextLog);
     onChange(serializeSportLog(nextLog));
   };
 
@@ -174,8 +169,8 @@ export function SportInput({ label, value, labels, theme, onChange }: Props) {
             <TextInput
               value={activity.steps ? String(activity.steps) : ''}
               onChangeText={(text) => updateActivity(activity.id, { steps: parseStepsInput(text) })}
-              placeholder={labels.sportStepsPlaceholder}
-              placeholderTextColor={theme.textSecondary}
+              placeholder={`... ${labels.sportStepsPlaceholder.toLocaleLowerCase()}`}
+              placeholderTextColor={theme.iconMuted}
               keyboardType="number-pad"
               style={[styles.stepsInput, { color: theme.text, borderColor: theme.inactiveBorder }]}
             />
@@ -192,9 +187,9 @@ export function SportInput({ label, value, labels, theme, onChange }: Props) {
   };
 
   return (
-    <View style={[styles.sectionBlock, { borderColor: theme.rowBorder }]}>
-      <Text style={[styles.sectionLabel, { color: theme.textSecondary, backgroundColor: theme.sectionLabelBg }]}>
-        {label}
+    <View style={styles.sectionBlock}>
+      <Text style={[styles.sectionLabel, { backgroundColor: theme.sectionLabelBg }]}>
+        {formatSectionTitle(label)}
       </Text>
 
       <View style={styles.content}>
@@ -207,8 +202,10 @@ export function SportInput({ label, value, labels, theme, onChange }: Props) {
             { borderColor: theme.inactiveBorder, backgroundColor: theme.inactiveBg },
             pressed && styles.pressed,
           ]}>
-          <Ionicons name="add-circle-outline" size={16} color={theme.text} />
-          <Text style={[styles.addButtonText, { color: theme.inactiveText }]}>{labels.sportAddActivity}</Text>
+          <Ionicons name="add-circle-outline" size={16} color={theme.activeBg} />
+          <Text style={[styles.addButtonText, { color: theme.activeBg }]}>
+            {labels.sportAddActivity.toLocaleLowerCase()}
+          </Text>
         </Pressable>
       </View>
     </View>
@@ -216,18 +213,16 @@ export function SportInput({ label, value, labels, theme, onChange }: Props) {
 }
 
 const styles = StyleSheet.create({
-  sectionBlock: { borderBottomWidth: 1 },
+  sectionBlock: {},
   sectionLabel: {
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 2,
-    textTransform: 'uppercase',
+    ...daySectionLabelStyle,
     paddingHorizontal: 16,
     paddingTop: 10,
     paddingBottom: 6,
   },
   content: {
     paddingHorizontal: 16,
+    paddingTop: 10,
     paddingBottom: 12,
     gap: 10,
   },
@@ -244,10 +239,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   activityTitle: {
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
+    ...weekServiceTextStyle,
   },
   removeBtn: {
     width: 24,
@@ -270,16 +262,13 @@ const styles = StyleSheet.create({
     maxWidth: '48%',
   },
   typeChipText: {
-    fontSize: 10,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '500',
     textAlign: 'center',
-    lineHeight: 13,
+    lineHeight: 17,
   },
   fieldLabel: {
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
+    ...weekServiceTextStyle,
     marginTop: 2,
   },
   durationRow: {
@@ -293,14 +282,12 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 6,
-    fontSize: 13,
-    fontFamily: Fonts.mono,
-    fontWeight: '700',
+    ...weekBodyTextStyle,
     textAlign: 'center',
   },
   durationUnit: {
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '500',
     marginRight: 4,
   },
   stepsInput: {
@@ -308,22 +295,19 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 8,
-    fontSize: 13,
-    fontFamily: Fonts.mono,
-    fontWeight: '700',
+    ...weekBodyTextStyle,
+    lineHeight: 20,
   },
   otherInput: {
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 8,
-    fontSize: 12,
-    fontWeight: '600',
+    ...weekBodyTextStyle,
   },
   durationSummary: {
-    fontSize: 11,
-    fontFamily: Fonts.mono,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '500',
     marginTop: 2,
   },
   addButton: {
@@ -337,9 +321,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   addButtonText: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.4,
+    ...weekBodyTextStyle,
   },
   pressed: { opacity: 0.7 },
 });

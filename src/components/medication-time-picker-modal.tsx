@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { format } from 'date-fns';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { AppLabels } from '@/constants/i18n';
@@ -42,23 +42,19 @@ export function formatTimeValue(date: Date): string {
   return format(date, 'HH:mm');
 }
 
-export function MedicationTimePickerModal({
-  visible,
+type ContentProps = Omit<Props, 'visible'>;
+
+function MedicationTimePickerModalContent({
   title,
   labels,
   theme,
   initialTime,
   onClose,
   onSelect,
-}: Props) {
+}: ContentProps) {
   const [pickerValue, setPickerValue] = useState(() => parseTimeValue(initialTime));
 
-  useEffect(() => {
-    if (!visible) return;
-    setPickerValue(parseTimeValue(initialTime));
-  }, [visible, initialTime]);
-
-  if (Platform.OS === 'android' && visible) {
+  if (Platform.OS === 'android') {
     return (
       <DateTimePicker
         value={pickerValue}
@@ -75,7 +71,6 @@ export function MedicationTimePickerModal({
   }
 
   return (
-    <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
       <Pressable style={[styles.overlay, { backgroundColor: theme.modalOverlay }]} onPress={onClose}>
         <Pressable
           style={[styles.card, { backgroundColor: theme.modalBg, borderColor: theme.subtlePanelBorder }]}
@@ -113,6 +108,17 @@ export function MedicationTimePickerModal({
           </View>
         </Pressable>
       </Pressable>
+  );
+}
+
+export function MedicationTimePickerModal({ visible, ...contentProps }: Props) {
+  if (Platform.OS === 'android') {
+    return visible ? <MedicationTimePickerModalContent key={contentProps.initialTime} {...contentProps} /> : null;
+  }
+
+  return (
+    <Modal transparent visible={visible} animationType="fade" onRequestClose={contentProps.onClose}>
+      {visible ? <MedicationTimePickerModalContent key={contentProps.initialTime} {...contentProps} /> : null}
     </Modal>
   );
 }

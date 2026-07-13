@@ -1,15 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
-import { addMonths, format, parse } from 'date-fns';
 import type { Locale } from 'date-fns';
-import { useEffect, useMemo, useState } from 'react';
+import { addMonths, format, parse } from 'date-fns';
+import { useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { MedicationDatePickerModal } from '@/components/medication-date-picker-modal';
 import { MedicationIntakeDaysModal } from '@/components/medication-intake-days-modal';
 import { formatTimeValue, MedicationTimePickerModal, parseTimeValue } from '@/components/medication-time-picker-modal';
 import type { AppLabels } from '@/constants/i18n';
-import { Fonts } from '@/constants/theme';
+import { weekBodyTextStyle, weekButtonTextStyle, weekCardTitleStyle, weekDayTitleStyle, weekFieldLabelStyle, weekServiceTextStyle } from '@/constants/typography';
 import type { MedicationRepeatConfig } from '@/stores/wellness-store';
+import { formatDayMonth } from '@/utils/date-format';
 import { formatIntakeDaysSummary } from '@/utils/medication-intake';
 
 type ThemeSlice = {
@@ -50,6 +51,10 @@ function normalizeTimeLabel(time: string): string {
   return formatTimeValue(parseTimeValue(time));
 }
 
+function getInitialLocalTimes(times: string[]): string[] {
+  return times.length > 0 ? times.map((time) => (time.trim() ? normalizeTimeLabel(time) : '')) : [''];
+}
+
 export function MedicationScheduleModal({
   visible,
   labels,
@@ -70,22 +75,14 @@ export function MedicationScheduleModal({
   const [showIntakeDaysPicker, setShowIntakeDaysPicker] = useState(false);
   const [datePickerTarget, setDatePickerTarget] = useState<DatePickerTarget | null>(null);
   const [timePickerIndex, setTimePickerIndex] = useState<number | null>(null);
-  const [localTimes, setLocalTimes] = useState<string[]>([]);
+  const [localTimes, setLocalTimes] = useState<string[]>(() => getInitialLocalTimes(times));
   const [localRepeat, setLocalRepeat] = useState(repeat);
   const [localIntakeSummary, setLocalIntakeSummary] = useState(intakeDaysSummary);
-  const [localStartKey, setLocalStartKey] = useState(durationStartKey);
-  const [localEndKey, setLocalEndKey] = useState<string | null | undefined>(undefined);
-
-  useEffect(() => {
-    if (!visible) return;
-    setLocalTimes(
-      times.length > 0 ? times.map(normalizeTimeLabel) : [formatTimeValue(new Date())],
-    );
-    setLocalRepeat(repeat);
-    setLocalIntakeSummary(intakeDaysSummary);
-    setLocalStartKey(repeat.startDateKey ?? durationStartKey);
-    setLocalEndKey(repeat.endDateKey);
-  }, [visible, times, repeat, intakeDaysSummary, repeat.startDateKey, repeat.endDateKey, durationStartKey]);
+  const [localStartKey, setLocalStartKey] = useState(() => repeat.startDateKey ?? durationStartKey);
+  const [localEndKey, setLocalEndKey] = useState<string | null | undefined>(() => {
+    const initialStartKey = repeat.startDateKey ?? durationStartKey;
+    return repeat.endDateKey === undefined ? initialStartKey : repeat.endDateKey;
+  });
 
   const durationDates = useMemo(() => {
     const start = parse(localStartKey, 'yyyy-MM-dd', new Date());
@@ -93,11 +90,11 @@ export function MedicationScheduleModal({
       localEndKey === null
         ? labels.medicationScheduleNoEnd
         : localEndKey
-          ? format(parse(localEndKey, 'yyyy-MM-dd', new Date()), 'd MMMM', { locale })
-          : format(addMonths(start, localRepeat.months), 'd MMMM', { locale });
+          ? formatDayMonth(parse(localEndKey, 'yyyy-MM-dd', new Date()), locale)
+          : formatDayMonth(addMonths(start, localRepeat.months), locale);
 
     return {
-      startLabel: format(start, 'd MMMM', { locale }),
+      startLabel: formatDayMonth(start, locale),
       endLabel,
       endIsNone: localEndKey === null,
     };
@@ -117,7 +114,7 @@ export function MedicationScheduleModal({
   };
 
   const addTime = () => {
-    const nextTimes = [...localTimes, formatTimeValue(new Date())];
+    const nextTimes = [...localTimes, ''];
     setLocalTimes(nextTimes);
     onUpdateTimes(nextTimes);
   };
@@ -197,15 +194,19 @@ export function MedicationScheduleModal({
                       hitSlop={6}
                       style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]}>
                       <Ionicons
-                        name="remove-circle"
-                        size={22}
-                        color={localTimes.length <= 1 ? theme.inactiveBorder : '#ef4444'}
+                        name="remove-circle-outline"
+                        size={16}
+                        color={localTimes.length <= 1 ? theme.inactiveBorder : theme.textSecondary}
                       />
                     </Pressable>
                     <Pressable
                       onPress={() => setTimePickerIndex(index)}
                       style={({ pressed }) => [styles.timeBtn, pressed && styles.pressed]}>
-                      <Text style={[styles.timeText, { color: theme.text }]}>{entryTime}</Text>
+                      {entryTime.trim() ? (
+                        <Text style={[styles.timeText, { color: theme.text }]}>{entryTime}</Text>
+                      ) : (
+                        <Ionicons name="time-outline" size={28} color={theme.textSecondary} />
+                      )}
                     </Pressable>
                   </View>
                 ))}
@@ -221,9 +222,9 @@ export function MedicationScheduleModal({
                     pressed && styles.pressed,
                   ]}>
                   <View style={styles.iconBtn}>
-                    <Ionicons name="add-circle" size={22} color="#22c55e" />
+                    <Ionicons name="add-circle-outline" size={16} color={theme.activeBg} />
                   </View>
-                  <Text style={[styles.actionRowText, { color: theme.inactiveText }]}>
+                  <Text style={[styles.actionRowText, styles.addTimeText, { color: theme.activeBg }]}>
                     {labels.medicationScheduleAddTime}
                   </Text>
                 </Pressable>
@@ -339,8 +340,13 @@ export function MedicationScheduleModal({
         selectedDateKey={localStartKey}
         onClose={() => setDatePickerTarget(null)}
         onSelect={(dateKey) => {
+          const nextEndKey =
+            localEndKey === undefined || (typeof localEndKey === 'string' && localEndKey < dateKey)
+              ? dateKey
+              : localEndKey;
           setLocalStartKey(dateKey);
-          onUpdateDuration({ startDateKey: dateKey });
+          setLocalEndKey(nextEndKey);
+          onUpdateDuration({ startDateKey: dateKey, endDateKey: nextEndKey });
         }}
       />
 
@@ -389,7 +395,7 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   headerBtn: { minWidth: 72 },
-  title: { fontSize: 14, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' },
+  title: { ...weekCardTitleStyle },
   scroll: { flexGrow: 0 },
   scrollContent: { paddingHorizontal: 16, paddingBottom: 8, gap: 6 },
   footer: {
@@ -410,9 +416,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   deleteButtonText: {
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+    ...weekButtonTextStyle,
   },
   doneButton: {
     alignItems: 'center',
@@ -426,23 +430,14 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   doneButtonText: {
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
+    ...weekButtonTextStyle,
   },
   medName: {
-    fontSize: 11,
-    fontFamily: Fonts.mono,
+    ...weekDayTitleStyle,
     marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
   },
   sectionLabel: {
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 1.5,
-    textTransform: 'uppercase',
+    ...weekFieldLabelStyle,
     marginTop: 10,
     marginBottom: 6,
   },
@@ -460,12 +455,10 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
   },
-  actionRowText: { flex: 1, fontSize: 12, fontWeight: '700', letterSpacing: 0.5 },
+  actionRowText: { ...weekBodyTextStyle, flex: 1 },
+  addTimeText: { ...weekButtonTextStyle },
   actionRowMeta: {
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
+    ...weekServiceTextStyle,
   },
   iconBtn: {
     width: 24,
@@ -478,9 +471,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   timeText: {
-    fontSize: 12,
-    fontFamily: Fonts.mono,
-    fontWeight: '700',
+    ...weekBodyTextStyle,
   },
   pressed: { opacity: 0.7 },
 });

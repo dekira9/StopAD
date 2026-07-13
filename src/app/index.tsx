@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { observer } from 'mobx-react-lite';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -23,6 +24,7 @@ import { AllMedicationsModal, catalogEntryMedicationLabel } from '@/components/a
 import { CoachMarksOverlay, type CoachMarkTarget } from '@/components/coach-marks-overlay';
 import { ExpandableInput } from '@/components/expandable-input';
 import { ImportantInfoModal } from '@/components/important-info-modal';
+import { MedicationIntakeLegendModal } from '@/components/medication-intake-legend-modal';
 import { MedicationScheduleModal } from '@/components/medication-schedule-modal';
 import { MedicationStatusModal } from '@/components/medication-status-modal';
 import { formatTimeValue, MedicationTimePickerModal, parseTimeValue } from '@/components/medication-time-picker-modal';
@@ -30,17 +32,36 @@ import { OnboardingModal, type OnboardingResult } from '@/components/onboarding-
 import { PanicAttackCountInput } from '@/components/panic-attack-count-input';
 import { PanicAttackModal } from '@/components/panic-attack-modal';
 import { SleepInput } from '@/components/sleep-input';
+import { SleepNightObservationOverlay } from '@/components/sleep-night-observation-modal';
 import { SportInput } from '@/components/sport-input';
 import { TriggersInput } from '@/components/triggers-input';
 import { WeeklySummaryCharts } from '@/components/weekly-summary-charts';
 import { LANGUAGES, type Language } from '@/constants/i18n';
-import { Colors, Fonts, MaxContentWidth } from '@/constants/theme';
+import { Colors, Fonts, getDayWeekBackground, getDayWeekHeaderBackground, MaxContentWidth, type WeekdayIndex } from '@/constants/theme';
+import {
+  dayHeaderTitleStyle,
+  dayMedicationsHeaderStyle,
+  dayMedicationsStatusStyle,
+  daySectionLabelStyle,
+  formatSectionTitle,
+  sectionTitleStyle,
+  weekBodyTextStyle,
+  weekButtonTextStyle,
+  weekCardTitleStyle,
+  weekDateStyle,
+  weekFieldLabelStyle,
+  weekMonthTitleStyle,
+  weekServiceTextStyle,
+  weekYearStyle,
+} from '@/constants/typography';
 import { useTheme } from '@/hooks/use-theme';
 import { ensureNotificationPermissions } from '@/services/notifications';
-import { DEFAULT_MEDICATION_ROWS, formatMedicationLabel, wellnessStore, type MedicationRow } from '@/stores/wellness-store';
+import { DEFAULT_MEDICATION_ROWS, formatMedicationLabel, parseMedicationLabel, wellnessStore, type MedicationRow } from '@/stores/wellness-store';
+import { formatMonthName } from '@/utils/date-format';
 import { formatIntakeDaysSummary } from '@/utils/medication-intake';
 import { resolvePanicAttackCount } from '@/utils/panic-attack-log';
-import { hasSleepLogContent, parseSleepLog } from '@/utils/sleep-log';
+import { hasSleepLogContent, parseSleepLog, serializeSleepLog } from '@/utils/sleep-log';
+import { mergeNightObservationIntoSleepLog } from '@/utils/sleep-night-observation';
 import { hasSportLogContent, parseSportLog } from '@/utils/sport-log';
 import { hasTriggerLogContent, parseTriggerLog } from '@/utils/trigger-log';
 import { exportWeeklySummaryPdf } from '@/utils/weekly-summary-pdf';
@@ -48,8 +69,6 @@ import {
   addDays,
   addWeeks,
   addYears,
-  differenceInCalendarWeeks,
-  endOfMonth,
   format,
   getDay,
   getMonth,
@@ -57,9 +76,7 @@ import {
   isPast,
   isSameDay,
   parse,
-  startOfMonth,
   startOfWeek,
-  subDays,
   subWeeks,
   subYears,
 } from 'date-fns';
@@ -76,9 +93,38 @@ function generateSafeId(dateKey: string, baseIndex: number, existing: Medication
   return newId;
 }
 
+type DisplayMedicationRow = {
+  row: MedicationRow;
+  originalIndex: number;
+  displayTime: string;
+};
+
+function getMedicationSortMinutes(time: string): number | null {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(time.trim());
+  if (!match) return null;
+
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+
+  return hours * 60 + minutes;
+}
+
+function compareMedicationDisplayRows(a: DisplayMedicationRow, b: DisplayMedicationRow) {
+  const aMinutes = getMedicationSortMinutes(a.displayTime);
+  const bMinutes = getMedicationSortMinutes(b.displayTime);
+
+  if (aMinutes !== null && bMinutes !== null && aMinutes !== bMinutes) {
+    return aMinutes - bMinutes;
+  }
+  if (aMinutes !== null && bMinutes === null) return -1;
+  if (aMinutes === null && bMinutes !== null) return 1;
+
+  return a.originalIndex - b.originalIndex;
+}
+
 function isDayNotesExpandedByDefault(day: Date) {
-  const today = new Date();
-  return isSameDay(day, today) || isSameDay(day, subDays(today, 1));
+  return isSameDay(day, new Date());
 }
 
 function HomeScreen() {
@@ -94,15 +140,14 @@ function HomeScreen() {
       circleBg: isDark ? 'rgba(26,36,32,0.95)' : '#FFFFFF',
       circleBorder: isDark ? 'rgba(125,168,146,0.30)' : 'rgba(107,144,128,0.22)',
       circleShadow: isDark ? 0 : 0.07,
-      contentBg: isDark ? theme.background : '#FFFFFF',
-      dayHeaderBg: theme.backgroundElement,
+      contentBg: theme.background,
       dayBorder: isDark ? 'rgba(125,168,146,0.24)' : 'rgba(107,144,128,0.20)',
       rowBorder: isDark ? 'rgba(125,168,146,0.12)' : 'rgba(26,46,36,0.07)',
       sectionLabelBg: theme.backgroundSelected,
-      notesBlockBg: isDark ? 'rgba(21,28,24,0.70)' : 'rgba(247,249,247,0.92)',
-      panicRowBg: theme.panicRow,
+      notesBlockBg: isDark ? 'rgba(21,28,24,0.70)' : Colors.light.cardSurface,
+      medicationCompleted: isDark ? Colors.dark.medicationCompleted : Colors.light.medicationCompleted,
       accent: theme.accent,
-      footerBg: isDark ? 'rgba(21,28,24,0.90)' : 'rgba(255,255,255,0.94)',
+      panelEdgeShadow: isDark ? 0.22 : 0.09,
       footerBorder: isDark ? 'rgba(125,168,146,0.22)' : 'rgba(107,144,128,0.16)',
       modalOverlay: isDark ? 'rgba(5,10,7,0.72)' : 'rgba(20,35,25,0.38)',
       modalBg: isDark ? '#151C18' : '#FFFFFF',
@@ -127,7 +172,7 @@ function HomeScreen() {
   );
 
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [language, setLanguage] = useState<Language>('ru');
+  const [localLanguage, setLocalLanguage] = useState<Language>('ru');
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [isMonthPickerMounted, setIsMonthPickerMounted] = useState(false);
   const [showLangPicker, setShowLangPicker] = useState(false);
@@ -138,6 +183,7 @@ function HomeScreen() {
   const [showMedicationSchedule, setShowMedicationSchedule] = useState(false);
   const [showAllMedications, setShowAllMedications] = useState(false);
   const [showImportantInfo, setShowImportantInfo] = useState(false);
+  const [showMedicationIntakeLegend, setShowMedicationIntakeLegend] = useState(false);
   const [showPanicAttack, setShowPanicAttack] = useState(false);
   const [isExportingWeeklyPdf, setIsExportingWeeklyPdf] = useState(false);
   const [catalogScheduleTarget, setCatalogScheduleTarget] = useState<{
@@ -156,26 +202,25 @@ function HomeScreen() {
     time: string;
   } | null>(null);
 
-  const monthPickerAnim = useRef(new Animated.Value(0)).current;
+  const [monthPickerAnim] = useState(() => new Animated.Value(0));
   const scrollViewRef = useRef<ScrollView>(null);
   const scrollYRef = useRef(0);
   const fieldAnchorRefs = useRef<Record<string, View | null>>({});
   const lastFocusedFieldKey = useRef<string | null>(null);
+  const [nightObservationDateKey, setNightObservationDateKey] = useState<string | null>(null);
+  const nightObservationActive = nightObservationDateKey !== null;
   const [footerHeight, setFooterHeight] = useState(72);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const language = wellnessStore.preferredLanguage ?? localLanguage;
   const t = LANGUAGES[language].labels;
   const locale = LANGUAGES[language].locale;
   const showOnboarding = wellnessStore.hydrated && !wellnessStore.onboardingCompleted;
+  const shouldEnsureNotificationPermissions = wellnessStore.hydrated && wellnessStore.onboardingCompleted;
   const showCoachMarks =
     wellnessStore.hydrated &&
     wellnessStore.onboardingCompleted &&
     !wellnessStore.coachMarksSeen &&
     !showOnboarding;
-
-  useEffect(() => {
-    if (!wellnessStore.hydrated || !wellnessStore.preferredLanguage) return;
-    setLanguage(wellnessStore.preferredLanguage);
-  }, [wellnessStore.hydrated, wellnessStore.preferredLanguage]);
 
   const measureCoachMarkTargets = useCallback(() => {
     panicButtonRef.current?.measureInWindow((x, y, width, height) => {
@@ -192,45 +237,24 @@ function HomeScreen() {
 
   useEffect(() => {
     if (!showCoachMarks) return;
-    setCoachMarkStep(0);
-    const timer = setTimeout(measureCoachMarkTargets, 180);
+    const timer = setTimeout(() => {
+      setCoachMarkStep(0);
+      measureCoachMarkTargets();
+    }, 180);
     return () => clearTimeout(timer);
   }, [showCoachMarks, measureCoachMarkTargets, footerHeight]);
 
   const handleOnboardingComplete = useCallback(
-    async (result: OnboardingResult) => {
-      setLanguage(result.language);
+    (result: OnboardingResult) => {
+      setLocalLanguage(result.language);
       wellnessStore.setPreferredLanguage(result.language);
-
-      if (result.medication?.name.trim()) {
-        const todayKey = format(new Date(), 'yyyy-MM-dd');
-        const day = wellnessStore.getDay(todayKey);
-        const row = day.medications[0];
-        const medication = formatMedicationLabel(result.medication.name, result.medication.dose);
-        wellnessStore.updateMedication(
-          todayKey,
-          row.id,
-          {
-            medication,
-            time: result.medication.time,
-            reminderEnabled: result.enableNotifications,
-          },
-          0,
-        );
-      }
-
-      if (result.enableNotifications) {
-        await ensureNotificationPermissions();
-        void wellnessStore.rescheduleReminders();
-      }
-
       wellnessStore.completeOnboarding();
     },
     [],
   );
 
   const handleLanguageChange = useCallback((nextLanguage: Language) => {
-    setLanguage(nextLanguage);
+    setLocalLanguage(nextLanguage);
     wellnessStore.setPreferredLanguage(nextLanguage);
   }, []);
 
@@ -240,12 +264,12 @@ function HomeScreen() {
       notificationBody: t.notificationBody,
     });
     void wellnessStore.rescheduleReminders();
-  }, [language, t.notificationTitle, t.notificationBody]);
+  }, [t.notificationTitle, t.notificationBody]);
 
   useEffect(() => {
-    if (!wellnessStore.hydrated || !wellnessStore.onboardingCompleted) return;
+    if (!shouldEnsureNotificationPermissions) return;
     void ensureNotificationPermissions();
-  }, [wellnessStore.hydrated, wellnessStore.onboardingCompleted]);
+  }, [shouldEnsureNotificationPermissions]);
 
   const scrollFieldIntoView = useCallback(
     (key: string, keyboardInset = keyboardHeight) => {
@@ -296,7 +320,6 @@ function HomeScreen() {
 
   useEffect(() => {
     if (showMonthPicker) {
-      setIsMonthPickerMounted(true);
       monthPickerAnim.setValue(0);
       Animated.timing(monthPickerAnim, {
         toValue: 1,
@@ -354,8 +377,8 @@ function HomeScreen() {
   const weekHeaderLabel = useMemo(() => {
     const weekStart = weekDays[0];
     const weekEnd = weekDays[weekDays.length - 1];
-    const startMonth = format(weekStart, 'LLLL', { locale });
-    const endMonth = format(weekEnd, 'LLLL', { locale });
+    const startMonth = formatMonthName(weekStart, locale);
+    const endMonth = formatMonthName(weekEnd, locale);
     const startYear = format(weekStart, 'yyyy');
     const endYear = format(weekEnd, 'yyyy');
 
@@ -374,7 +397,8 @@ function HomeScreen() {
     let medName = '';
     let row: MedicationRow | null = null;
     let fallbackWeekKey = currentWeekKey;
-    let defaultDurationStart = currentWeekKey;
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
+    let defaultDurationStart = todayKey;
 
     if (catalogScheduleTarget) {
       medName = catalogScheduleTarget.medication.trim();
@@ -397,7 +421,7 @@ function HomeScreen() {
         startOfWeek(parse(statusTarget.dateKey, 'yyyy-MM-dd', new Date()), { weekStartsOn: 1 }),
         'yyyy-MM-dd',
       );
-      defaultDurationStart = statusTarget.dateKey;
+      defaultDurationStart = todayKey;
       row = { ...row, time: wellnessStore.resolveMedicationRowTime(statusTarget.dateKey, row, statusTarget.idx) };
     } else {
       return null;
@@ -409,7 +433,7 @@ function HomeScreen() {
         ? schedule.times
         : row.time?.trim()
           ? [row.time.trim()]
-          : [format(new Date(), 'HH:mm')];
+          : [''];
     const repeat = schedule.repeat;
     const intakeDaysSummary = formatIntakeDaysSummary(repeat, t, weekdayLabels);
 
@@ -434,17 +458,11 @@ function HomeScreen() {
     );
   }, [showMedicationSchedule, scheduleContext]);
 
-  const { currentWeekPage, totalWeekPages } = useMemo(() => {
-    const weekStartsOn = 1 as const;
-    const monthStart = startOfMonth(currentDate);
-    const currentWeekStart = startOfWeek(currentDate, { weekStartsOn });
-    const monthStartWeek = startOfWeek(monthStart, { weekStartsOn });
-    const monthEndWeek = startOfWeek(endOfMonth(currentDate), { weekStartsOn });
-    return {
-      currentWeekPage: differenceInCalendarWeeks(currentWeekStart, monthStartWeek, { weekStartsOn }) + 1,
-      totalWeekPages: differenceInCalendarWeeks(monthEndWeek, monthStartWeek, { weekStartsOn }) + 1,
-    };
-  }, [currentDate]);
+  const openMonthPicker = () => {
+    setShowLangPicker(false);
+    setIsMonthPickerMounted(true);
+    setShowMonthPicker(true);
+  };
 
   const toggleExpanded = (key: string) => {
     setExpandedInputs((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -467,7 +485,7 @@ function HomeScreen() {
     });
   };
 
-  const medInputRefs = useRef<Record<string, Array<TextInput | null>>>({});
+  const medInputRefs = useRef<Record<string, (TextInput | null)[]>>({});
 
   const focusMedInput = (dateKey: string, idx: number) => {
     medInputRefs.current[dateKey]?.[idx]?.focus();
@@ -491,9 +509,9 @@ function HomeScreen() {
           fieldAnchorRefs.current[expandKey] = node;
         }}
         collapsable={false}
-        style={[styles.sectionBlock, { borderColor: ui.rowBorder }]}>
-        <Text style={[styles.sectionLabel, { color: theme.textSecondary, backgroundColor: ui.sectionLabelBg }]}>
-          {label}
+        style={[styles.dayNotesSectionCard, { borderColor: ui.rowBorder, backgroundColor: ui.notesBlockBg }]}>
+        <Text style={[styles.sectionLabel, { backgroundColor: ui.sectionLabelBg }]}>
+          {formatSectionTitle(label)}
         </Text>
         <View style={styles.sectionInputWrap}>
           <ExpandableInput
@@ -531,7 +549,6 @@ function HomeScreen() {
         inactiveText: ui.inactiveText,
         rowBorder: ui.rowBorder,
         sectionLabelBg: ui.sectionLabelBg,
-        panicRowBg: ui.panicRowBg,
         iconMuted: ui.iconMuted,
       }}
       onChange={(count) => wellnessStore.setPanicAttackCount(dateKey, count)}
@@ -556,76 +573,88 @@ function HomeScreen() {
         <Pressable
           onPress={() => toggleExpanded(notesExpandKey)}
           style={({ pressed }) => [styles.dayNotesHeader, pressed && styles.pressed]}>
-          <View style={styles.dayNotesHeaderLeft}>
-            <Text style={[styles.dayNotesTitle, { color: theme.textSecondary }]}>{t.dayNotes}</Text>
-            {!isNotesExpanded && hasNotes ? (
-              <View style={[styles.dayNotesDot, { backgroundColor: ui.accent }]} />
-            ) : null}
+          <View style={styles.dayNotesTitleRow}>
+            <Text style={[styles.dayNotesTitle, { color: '#4D4D4D' }]}>{formatSectionTitle(t.dayNotes)}</Text>
+            {!isNotesExpanded && hasNotes ? <View style={[styles.dayNotesDot, { backgroundColor: ui.accent }]} /> : null}
           </View>
-          <Ionicons name={isNotesExpanded ? 'chevron-up' : 'chevron-down'} size={14} color={ui.iconMuted} />
+          <Ionicons
+            name={isNotesExpanded ? 'caret-up' : 'caret-down'}
+            size={23}
+            color={ui.iconMuted}
+            style={styles.dayNotesCaret}
+          />
         </Pressable>
         {isNotesExpanded ? (
-          <View style={[styles.dayNotesBody, { backgroundColor: ui.notesBlockBg, borderColor: ui.dayBorder }]}>
-            <SleepInput
-              label={t.sleep}
-              value={storedDay?.sleep ?? ''}
-              labels={t}
-              theme={{
-                text: theme.text,
-                textSecondary: theme.textSecondary,
-                activeBg: ui.activeBg,
-                activeText: ui.activeText,
-                inactiveBg: ui.inactiveBg,
-                inactiveBorder: ui.inactiveBorder,
-                inactiveText: ui.inactiveText,
-                modalOverlay: ui.modalOverlay,
-                modalBg: ui.modalBg,
-                subtlePanelBorder: ui.subtlePanelBorder,
-                sectionLabelBg: ui.sectionLabelBg,
-                rowBorder: ui.rowBorder,
-                iconMuted: ui.iconMuted,
-              }}
-              onChange={(text) => wellnessStore.updateDayField(dateKey, 'sleep', text)}
-            />
-            <TriggersInput
-              label={t.triggers}
-              value={storedDay?.triggers ?? ''}
-              language={language}
-              labels={t}
-              theme={{
-                text: theme.text,
-                textSecondary: theme.textSecondary,
-                activeBg: ui.activeBg,
-                activeText: ui.activeText,
-                inactiveBg: ui.inactiveBg,
-                inactiveBorder: ui.inactiveBorder,
-                inactiveText: ui.inactiveText,
-                sectionLabelBg: ui.sectionLabelBg,
-                rowBorder: ui.rowBorder,
-                iconMuted: ui.iconMuted,
-              }}
-              onChange={(text) => wellnessStore.updateDayField(dateKey, 'triggers', text)}
-            />
-            <SportInput
-              label={t.sport}
-              value={storedDay?.sport ?? ''}
-              labels={t}
-              theme={{
-                text: theme.text,
-                textSecondary: theme.textSecondary,
-                activeBg: ui.activeBg,
-                activeText: ui.activeText,
-                inactiveBg: ui.inactiveBg,
-                inactiveBorder: ui.inactiveBorder,
-                inactiveText: ui.inactiveText,
-                sectionLabelBg: ui.sectionLabelBg,
-                rowBorder: ui.rowBorder,
-                iconMuted: ui.iconMuted,
-              }}
-              onChange={(text) => wellnessStore.updateDayField(dateKey, 'sport', text)}
-            />
+          <View style={styles.dayNotesSections}>
+            <View style={[styles.dayNotesSectionCard, { borderColor: ui.rowBorder, backgroundColor: ui.notesBlockBg }]}>
+              <SleepInput
+                label={t.sleep}
+                value={storedDay?.sleep ?? ''}
+                labels={t}
+                theme={{
+                  text: theme.text,
+                  textSecondary: theme.textSecondary,
+                  activeBg: ui.activeBg,
+                  activeText: ui.activeText,
+                  inactiveBg: ui.inactiveBg,
+                  inactiveBorder: ui.inactiveBorder,
+                  inactiveText: ui.inactiveText,
+                  modalOverlay: ui.modalOverlay,
+                  modalBg: ui.modalBg,
+                  subtlePanelBorder: ui.subtlePanelBorder,
+                  sectionLabelBg: ui.sectionLabelBg,
+                  rowBorder: ui.rowBorder,
+                  iconMuted: ui.iconMuted,
+                }}
+                onChange={(text) => wellnessStore.updateDayField(dateKey, 'sleep', text)}
+                onOpenNightObservation={() => setNightObservationDateKey(dateKey)}
+              />
+            </View>
+            <View style={[styles.dayNotesSectionCard, { borderColor: ui.rowBorder, backgroundColor: ui.notesBlockBg }]}>
+              <TriggersInput
+                label={t.triggers}
+                value={storedDay?.triggers ?? ''}
+                language={language}
+                labels={t}
+                theme={{
+                  text: theme.text,
+                  textSecondary: theme.textSecondary,
+                  activeBg: ui.activeBg,
+                  activeText: ui.activeText,
+                  inactiveBg: ui.inactiveBg,
+                  inactiveBorder: ui.inactiveBorder,
+                  inactiveText: ui.inactiveText,
+                  sectionLabelBg: ui.sectionLabelBg,
+                  rowBorder: ui.rowBorder,
+                  iconMuted: ui.iconMuted,
+                }}
+                onChange={(text) => wellnessStore.updateDayField(dateKey, 'triggers', text)}
+              />
+            </View>
+            <View style={[styles.dayNotesSectionCard, { borderColor: ui.rowBorder, backgroundColor: ui.notesBlockBg }]}>
+              <SportInput
+                label={t.sport}
+                value={storedDay?.sport ?? ''}
+                labels={t}
+                theme={{
+                  text: theme.text,
+                  textSecondary: theme.textSecondary,
+                  activeBg: ui.activeBg,
+                  activeText: ui.activeText,
+                  inactiveBg: ui.inactiveBg,
+                  inactiveBorder: ui.inactiveBorder,
+                  inactiveText: ui.inactiveText,
+                  sectionLabelBg: ui.sectionLabelBg,
+                  rowBorder: ui.rowBorder,
+                  iconMuted: ui.iconMuted,
+                }}
+                onChange={(text) => wellnessStore.updateDayField(dateKey, 'sport', text)}
+              />
+            </View>
             {renderSectionField(dateKey, 'events', t.events, storedDay?.events ?? '')}
-            {renderPanicAttackField(dateKey, storedDay)}
+            <View style={[styles.dayNotesSectionCard, { borderColor: ui.rowBorder, backgroundColor: ui.notesBlockBg }]}>
+              {renderPanicAttackField(dateKey, storedDay)}
+            </View>
           </View>
         ) : null}
       </View>
@@ -633,11 +662,16 @@ function HomeScreen() {
   };
 
   return (
-    <View style={[styles.outer, { backgroundColor: theme.background }]}>
-      <SafeAreaView style={styles.safeArea}>
+    <>
+      <View style={[styles.outer, { backgroundColor: theme.background }]}>
+        <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
         <View style={[styles.cardWrapper, { maxWidth: MaxContentWidth }]}>
-          <View style={[styles.card, { backgroundColor: ui.contentBg, borderColor: ui.cardBorder }]}>
-            <View style={[styles.stickyHeader, { borderColor: ui.dayBorder, backgroundColor: ui.contentBg }]}>
+          <View style={[styles.card, styles.cardSurface, { backgroundColor: ui.contentBg, borderColor: ui.cardBorder }]}>
+            <View
+              style={[
+                styles.stickyHeader,
+                { borderColor: ui.dayBorder, backgroundColor: ui.contentBg, shadowOpacity: ui.panelEdgeShadow },
+              ]}>
               <View style={styles.header}>
                 <View style={styles.headerRow}>
                   <Pressable
@@ -651,10 +685,7 @@ function HomeScreen() {
                   </Pressable>
 
                   <Pressable
-                    onPress={() => {
-                      setShowLangPicker(false);
-                      setShowMonthPicker(true);
-                    }}
+                    onPress={openMonthPicker}
                     style={styles.monthPickerButton}>
                     <Text
                       style={[
@@ -677,19 +708,6 @@ function HomeScreen() {
                     ]}>
                     <Ionicons name="chevron-forward" size={20} color={ui.icon} />
                   </Pressable>
-                </View>
-              </View>
-
-              <View style={styles.tableHeaderRow}>
-                <View style={styles.colDelete} />
-                <View style={styles.colTime}>
-                  <Text style={[styles.tableHeaderText, { color: theme.textSecondary }]}>{t.time}</Text>
-                </View>
-                <View style={styles.colMed}>
-                  <Text style={[styles.tableHeaderText, { color: theme.textSecondary }]}>{t.medication}</Text>
-                </View>
-                <View style={styles.colStatus}>
-                  <Text style={[styles.tableHeaderText, { color: theme.textSecondary }]}>{t.status}</Text>
                 </View>
               </View>
             </View>
@@ -721,33 +739,45 @@ function HomeScreen() {
                 const adherence = wellnessStore.getMedicationAdherence(dateKey);
 
                 const displayCount = Math.max(storedMeds.length, DEFAULT_MEDICATION_ROWS);
-                const medRows: MedicationRow[] = Array.from({ length: displayCount }).map((_, idx) => {
-                  if (storedMeds[idx]) return storedMeds[idx];
-                  return {
-                    id: generateSafeId(dateKey, idx, storedMeds),
-                    time: '',
-                    medication: '',
-                    taken: false,
-                    skipped: false,
-                    reminderEnabled: true,
-                  };
-                });
+                const medRows: DisplayMedicationRow[] = Array.from({ length: displayCount })
+                  .map((_, idx) => {
+                    const row =
+                      storedMeds[idx] ??
+                      {
+                        id: generateSafeId(dateKey, idx, storedMeds),
+                        time: '',
+                        medication: '',
+                        taken: false,
+                        skipped: false,
+                        reminderEnabled: true,
+                      };
+
+                    return {
+                      row,
+                      originalIndex: idx,
+                      displayTime: wellnessStore.resolveMedicationRowTime(dateKey, row, idx),
+                    };
+                  })
+                  .sort(compareMedicationDisplayRows);
+
+                const weekdayIndex = getDay(day) as WeekdayIndex;
+                const dayWeekBg = getDayWeekBackground(isDark, weekdayIndex);
 
                 const reviewBg =
                   isReviewMode && isPastDay && !isSunday
                     ? adherence === 'full'
-                      ? 'rgba(34, 197, 94, 0.08)'
+                      ? 'rgba(34, 197, 94, 0.14)'
                       : adherence === 'partial' || adherence === 'none'
-                        ? 'rgba(239, 68, 68, 0.08)'
-                        : 'transparent'
-                    : 'transparent';
+                        ? 'rgba(239, 68, 68, 0.14)'
+                        : dayWeekBg
+                    : dayWeekBg;
 
                 const dayHeaderBg =
                   isReviewMode && isPastDay && !isSunday && adherence !== 'empty'
                     ? adherence === 'full'
                       ? 'rgba(34, 197, 94, 0.16)'
                       : 'rgba(239, 68, 68, 0.16)'
-                    : ui.dayHeaderBg;
+                    : getDayWeekHeaderBackground(isDark, weekdayIndex);
 
                 return (
                   <View key={dateKey} style={[styles.daySection, { backgroundColor: reviewBg }]}>
@@ -760,132 +790,189 @@ function HomeScreen() {
                             { color: theme.text },
                             isReviewMode && isPastDay ? { textDecorationLine: 'line-through', opacity: 0.4 } : null,
                           ]}>
-                          {format(day, 'EEEE', { locale })}
+                          {formatSectionTitle(format(day, 'EEEE', { locale }))}
                         </Text>
                         <Text style={[styles.dayHeaderSubText, { color: theme.textSecondary }]}>
                           ({format(day, 'd.MM')})
                         </Text>
-                        {isToday ? <View style={[styles.todayDot, { backgroundColor: ui.accent }]} /> : null}
+                        {isToday ? (
+                          <Image
+                            source={require('@/assets/images/walking-person.gif')}
+                            style={styles.todayWalkingGif}
+                            contentFit="contain"
+                            accessibilityLabel={t.today}
+                          />
+                        ) : null}
                       </View>
-                      <Pressable
-                        onPress={() => wellnessStore.addMedicationRow(dateKey)}
-                        style={({ pressed }) => [
-                          styles.smallCircleButton,
-                          { backgroundColor: ui.circleBg, borderColor: ui.circleBorder, shadowOpacity: ui.circleShadow },
-                          pressed && styles.pressed,
-                        ]}>
-                        <Ionicons name="add" size={16} color={ui.icon} />
-                      </Pressable>
                     </View>
                     <View style={[styles.dayDivider, { backgroundColor: ui.dayBorder }]} />
 
-                    <Text style={[styles.blockTitle, { color: theme.textSecondary, backgroundColor: 'transparent' }]}>
-                      {t.medications}
-                    </Text>
-
                     <View style={[styles.dayNotesBody, { backgroundColor: ui.notesBlockBg, borderColor: ui.dayBorder }]}>
-                    {medRows.map((row, idx) => {
+                    <View style={[styles.medicationsBlockHeader, { borderColor: ui.rowBorder, backgroundColor: ui.sectionLabelBg }]}>
+                      <View style={styles.medicationsHeaderLeft}>
+                        <Text style={styles.medicationsHeaderText}>
+                          {formatSectionTitle(t.medications)}
+                        </Text>
+                        <Pressable
+                          onPress={() => wellnessStore.addMedicationRow(dateKey)}
+                          accessibilityLabel={t.addMedication}
+                          style={({ pressed }) => [
+                            styles.smallCircleButton,
+                            { backgroundColor: ui.circleBg, borderColor: ui.circleBorder, shadowOpacity: ui.circleShadow },
+                            pressed && styles.pressed,
+                          ]}>
+                          <Ionicons name="add" size={22} color={ui.icon} />
+                        </Pressable>
+                      </View>
+                      <View style={styles.medicationsHeaderStatus}>
+                        <Pressable
+                          onPress={() => setShowMedicationIntakeLegend(true)}
+                          hitSlop={8}
+                          accessibilityLabel={t.medicationIntakeLegendTitle}
+                          style={({ pressed }) => [pressed && styles.pressed]}>
+                          <Ionicons name="help-circle-outline" size={13} color={ui.iconMuted} />
+                        </Pressable>
+                        <Text style={styles.medicationsHeaderStatusText}>
+                          {t.status.toLocaleLowerCase()}
+                        </Text>
+                      </View>
+                    </View>
+                    {medRows.map(({ row, originalIndex, displayTime }, displayIndex) => {
                       const medExpandKey = `${dateKey}-med-${row.id}`;
-                      const displayTime = wellnessStore.resolveMedicationRowTime(dateKey, row, idx);
-                      const canStrike = row.taken || row.skipped || (isReviewMode && isPastDay);
+                      const medRowMutedStyle = row.taken
+                        ? { color: ui.medicationCompleted, opacity: 1, textDecorationLine: 'line-through' as const }
+                        : row.skipped
+                          ? { color: theme.textSecondary, opacity: 0.8, textDecorationLine: 'line-through' as const }
+                          : isReviewMode && isPastDay
+                            ? { color: theme.text, opacity: 0.35, textDecorationLine: 'line-through' as const }
+                            : { color: theme.text, opacity: 1, textDecorationLine: 'none' as const };
                       const hasReminder = !!displayTime?.trim() && !!row.medication.trim();
                       const canDeleteRow =
-                        storedMeds.length > DEFAULT_MEDICATION_ROWS && idx < storedMeds.length;
+                        storedMeds.length > DEFAULT_MEDICATION_ROWS &&
+                        originalIndex < storedMeds.length &&
+                        !row.medication.trim();
+                      const scheduledIntakeNumber = row.taken
+                        ? wellnessStore.getMedicationScheduledIntakeNumber(dateKey, row, originalIndex)
+                        : null;
+                      const hasTakenMeta = row.taken && (row.takenAt || scheduledIntakeNumber !== null);
+                      const showMedicationRowMeta = canDeleteRow || hasTakenMeta;
+                      const medicationParts = parseMedicationLabel(row.medication);
+                      const updateMedicationParts = (updates: Partial<{ name: string; dose: string }>) => {
+                        wellnessStore.updateMedication(
+                          dateKey,
+                          row.id,
+                          {
+                            medication: formatMedicationLabel(
+                              updates.name ?? medicationParts.name,
+                              updates.dose ?? medicationParts.dose,
+                            ),
+                          },
+                          originalIndex,
+                        );
+                      };
 
                       return (
-                        <View key={row.id} style={[styles.row, { borderColor: ui.rowBorder }]}>
-                          <View style={styles.colDeleteCell}>
-                            <Pressable
-                              onPress={() => wellnessStore.deleteMedicationRow(dateKey, idx)}
-                              disabled={!canDeleteRow}
-                              hitSlop={6}
-                              style={({ pressed }) => [styles.deleteBtn, pressed && canDeleteRow && styles.pressed]}>
-                              <Ionicons
-                                name="remove-circle"
-                                size={20}
-                                color={ui.iconMuted}
-                                style={{ opacity: canDeleteRow ? 1 : 0.35 }}
-                              />
-                            </Pressable>
-                          </View>
-                          <View style={styles.colTimeCell}>
-                            <Pressable
-                              onPress={() =>
-                                setMedTimeTarget({
-                                  dateKey,
-                                  rowId: row.id,
-                                  idx,
-                                  time: displayTime,
-                                })
-                              }
-                              style={({ pressed }) => [styles.timeBtn, pressed && styles.pressed]}>
-                              <Text
-                                style={[
-                                  styles.timeText,
-                                  {
-                                    color: displayTime?.trim() ? theme.text : theme.textSecondary,
-                                    opacity: canStrike ? 0.3 : 1,
-                                    textDecorationLine: canStrike ? 'line-through' : 'none',
-                                  },
-                                ]}>
-                                {displayTime?.trim()
-                                  ? formatTimeValue(parseTimeValue(displayTime))
-                                  : formatTimeValue(new Date())}
-                              </Text>
-                            </Pressable>
-                          </View>
-                          <View style={styles.colMedCell}>
-                            <ExpandableInput
-                              value={row.medication}
-                              onChangeText={(text) =>
-                                wellnessStore.updateMedication(dateKey, row.id, { medication: text }, idx)
-                              }
-                              expandKey={medExpandKey}
-                              isExpanded={!!expandedInputs[medExpandKey]}
-                              onToggleExpand={() => toggleExpanded(medExpandKey)}
-                              onFocus={() => handleFocus(medExpandKey)}
-                              onBlur={() => handleBlur(medExpandKey)}
-                              selection={inputSelections[medExpandKey]}
-                              iconMuted={ui.iconMuted}
-                              placeholder={t.medicationPlaceholder}
-                              placeholderTextColor={theme.textSecondary}
-                              color={theme.text}
-                              opacity={canStrike ? 0.3 : 1}
-                              textDecorationLine={canStrike ? 'line-through' : 'none'}
-                              returnKeyType={expandedInputs[medExpandKey] ? 'default' : 'next'}
-                              blurOnSubmit={false}
-                              onSubmitEditing={() => {
-                                const isLast = idx === medRows.length - 1;
-                                if (isLast) {
-                                  wellnessStore.addMedicationRow(dateKey);
-                                  setTimeout(() => focusMedInput(dateKey, idx + 1), 50);
-                                } else {
-                                  focusMedInput(dateKey, idx + 1);
-                                }
-                              }}
-                            />
-                          </View>
-                          <View style={styles.colReminderCell}>
-                            <Pressable
-                              onPress={() => wellnessStore.toggleMedicationReminder(dateKey, row.id, idx)}
-                              disabled={!hasReminder}
-                              style={({ pressed }) => [
-                                styles.reminderButton,
-                                pressed && styles.pressed,
-                                row.reminderEnabled && hasReminder ? { backgroundColor: ui.reminderOnBg } : null,
-                                !hasReminder ? { opacity: 0.25 } : null,
-                              ]}>
-                              <Ionicons
-                                name={row.reminderEnabled ? 'notifications' : 'notifications-off-outline'}
-                                size={13}
-                                color={ui.icon}
-                              />
-                            </Pressable>
-                          </View>
-                          <View style={styles.colCheckCell}>
-                            <View style={styles.takenStatusWrap}>
+                        <View key={row.id} style={[styles.row, { borderColor: ui.rowBorder, backgroundColor: ui.inactiveBg }]}>
+                          <View style={styles.medicationRowMain}>
+                            <View style={styles.colTimeCell}>
                               <Pressable
-                                onPress={() => setStatusTarget({ dateKey, rowId: row.id, idx })}
+                                onPress={() =>
+                                  setMedTimeTarget({
+                                    dateKey,
+                                    rowId: row.id,
+                                    idx: originalIndex,
+                                    time: displayTime,
+                                  })
+                                }
+                                style={({ pressed }) => [styles.timeBtn, pressed && styles.pressed]}>
+                                {displayTime?.trim() ? (
+                                  <Text style={[styles.timeText, medRowMutedStyle]}>
+                                    {formatTimeValue(parseTimeValue(displayTime))}
+                                  </Text>
+                                ) : (
+                                  <Ionicons name="time-outline" size={28} color={ui.iconMuted} />
+                                )}
+                              </Pressable>
+                            </View>
+                            <View style={styles.colMedCell}>
+                              <View style={styles.medicationSplitInputRow}>
+                                <TextInput
+                                  ref={(node) => setMedRef(dateKey, displayIndex, node)}
+                                  value={medicationParts.name}
+                                  onChangeText={(name) => updateMedicationParts({ name })}
+                                  onFocus={() => handleFocus(medExpandKey)}
+                                  onBlur={() => handleBlur(medExpandKey)}
+                                  placeholder={`... ${t.medicationName}`}
+                                  placeholderTextColor={ui.iconMuted}
+                                  returnKeyType="next"
+                                  blurOnSubmit={false}
+                                  onSubmitEditing={() => {
+                                    const isLast = displayIndex === medRows.length - 1;
+                                    if (isLast) {
+                                      wellnessStore.addMedicationRow(dateKey);
+                                      setTimeout(() => focusMedInput(dateKey, displayIndex + 1), 50);
+                                    } else {
+                                      focusMedInput(dateKey, displayIndex + 1);
+                                    }
+                                  }}
+                                  style={[
+                                    styles.medicationNameInput,
+                                    {
+                                      color: medRowMutedStyle.color,
+                                      opacity: medRowMutedStyle.opacity,
+                                      textDecorationLine: medRowMutedStyle.textDecorationLine,
+                                    },
+                                  ]}
+                                />
+                                <TextInput
+                                  value={medicationParts.dose}
+                                  onChangeText={(dose) => updateMedicationParts({ dose })}
+                                  onFocus={() => handleFocus(`${medExpandKey}-dose`)}
+                                  onBlur={() => handleBlur(`${medExpandKey}-dose`)}
+                                  placeholder={t.medicationDose}
+                                  placeholderTextColor={ui.iconMuted}
+                                  returnKeyType="next"
+                                  blurOnSubmit={false}
+                                  onSubmitEditing={() => {
+                                    const isLast = displayIndex === medRows.length - 1;
+                                    if (isLast) {
+                                      wellnessStore.addMedicationRow(dateKey);
+                                      setTimeout(() => focusMedInput(dateKey, displayIndex + 1), 50);
+                                    } else {
+                                      focusMedInput(dateKey, displayIndex + 1);
+                                    }
+                                  }}
+                                  style={[
+                                    styles.medicationDoseInput,
+                                    {
+                                      color: medRowMutedStyle.color,
+                                      opacity: medRowMutedStyle.opacity,
+                                      textDecorationLine: medRowMutedStyle.textDecorationLine,
+                                    },
+                                  ]}
+                                />
+                              </View>
+                            </View>
+                            <View style={styles.colReminderCell}>
+                              <Pressable
+                                onPress={() => wellnessStore.toggleMedicationReminder(dateKey, row.id, originalIndex)}
+                                disabled={!hasReminder}
+                                style={({ pressed }) => [
+                                  styles.reminderButton,
+                                  pressed && styles.pressed,
+                                  row.reminderEnabled && hasReminder ? { backgroundColor: ui.reminderOnBg } : null,
+                                  !hasReminder ? { opacity: 0.25 } : null,
+                                ]}>
+                                <Ionicons
+                                  name={row.reminderEnabled ? 'notifications' : 'notifications-off-outline'}
+                                  size={13}
+                                  color={ui.icon}
+                                />
+                              </Pressable>
+                            </View>
+                            <View style={styles.colCheckCell}>
+                              <Pressable
+                                onPress={() => setStatusTarget({ dateKey, rowId: row.id, idx: originalIndex })}
                                 style={({ pressed }) => [
                                   styles.checkButton,
                                   pressed && styles.pressed,
@@ -898,11 +985,40 @@ function HomeScreen() {
                                 {row.taken ? <Ionicons name="checkmark" size={14} color={ui.activeText} /> : null}
                                 {row.skipped ? <Ionicons name="close" size={14} color="#ef4444" /> : null}
                               </Pressable>
-                              {row.taken && row.takenAt ? (
-                                <Text style={[styles.takenAtText, { color: theme.textSecondary }]}>{row.takenAt}</Text>
-                              ) : null}
                             </View>
                           </View>
+                          {showMedicationRowMeta ? (
+                            <View style={styles.medicationRowMeta}>
+                              {hasTakenMeta ? (
+                                <View style={styles.takenMetaWrap}>
+                                  {row.takenAt ? (
+                                    <Text
+                                      style={[styles.takenAtText, { color: theme.textSecondary }]}
+                                      numberOfLines={1}
+                                      adjustsFontSizeToFit>
+                                      {row.takenAt}
+                                    </Text>
+                                  ) : null}
+                                  {scheduledIntakeNumber !== null ? (
+                                    <Text style={[styles.takenIntakeNumberText, { color: theme.textSecondary }]}>
+                                      {scheduledIntakeNumber}
+                                    </Text>
+                                  ) : null}
+                                </View>
+                              ) : null}
+                              {canDeleteRow ? (
+                                <Pressable
+                                  onPress={() => wellnessStore.deleteMedicationRow(dateKey, originalIndex)}
+                                  hitSlop={6}
+                                  style={({ pressed }) => [
+                                    styles.deleteBtn,
+                                    pressed && styles.pressed,
+                                  ]}>
+                                  <Ionicons name="remove-circle-outline" size={16} color={theme.textSecondary} />
+                                </Pressable>
+                              ) : null}
+                            </View>
+                          ) : null}
                         </View>
                       );
                     })}
@@ -936,7 +1052,7 @@ function HomeScreen() {
                 ) : null}
                 <View style={styles.weeklyNotesHeader}>
                   <Text style={[styles.weeklyNotesTitle, { color: theme.textSecondary, borderColor: ui.rowBorder }]}>
-                    {t.weeklySummary}
+                    {formatSectionTitle(t.weeklySummary)}
                   </Text>
                   <Pressable
                     onPress={handleExportWeeklyPdf}
@@ -963,7 +1079,7 @@ function HomeScreen() {
                   theme={{
                     text: theme.text,
                     textSecondary: theme.textSecondary,
-                    panelBg: ui.notesBlockBg,
+                    panelBg: ui.modalBg,
                     barColor: theme.text,
                     borderColor: ui.rowBorder,
                   }}
@@ -989,8 +1105,24 @@ function HomeScreen() {
               </View>
             </ScrollView>
 
+            {!nightObservationActive ? (
             <View
-              style={[styles.footer, { borderColor: ui.footerBorder, backgroundColor: ui.footerBg }]}
+              style={[
+                styles.footerChrome,
+                { borderColor: ui.footerBorder, backgroundColor: ui.contentBg },
+              ]}>
+              {Platform.OS === 'android' ? (
+                <View pointerEvents="none" style={styles.footerUpShadow}>
+                  <View style={[styles.footerUpShadowBand, { top: -2, opacity: ui.panelEdgeShadow * 1.3 }]} />
+                  <View style={[styles.footerUpShadowBand, { top: -4, opacity: ui.panelEdgeShadow * 0.9 }]} />
+                  <View style={[styles.footerUpShadowBand, { top: -6, opacity: ui.panelEdgeShadow * 0.55 }]} />
+                </View>
+              ) : null}
+            <View
+              style={[
+                styles.footer,
+                { shadowOpacity: ui.panelEdgeShadow },
+              ]}
               onLayout={(event) => {
                 setFooterHeight(event.nativeEvent.layout.height);
               }}>
@@ -1023,10 +1155,7 @@ function HomeScreen() {
                   <Text style={[styles.footerIconLabel, { color: theme.text }]}>{language.toUpperCase()}</Text>
                 </Pressable>
                 <Pressable
-                  onPress={() => {
-                    setShowLangPicker(false);
-                    setShowMonthPicker(true);
-                  }}
+                  onPress={openMonthPicker}
                   accessibilityLabel={t.selectMonth}
                   style={({ pressed }) => [
                     styles.footerIconButton,
@@ -1064,6 +1193,8 @@ function HomeScreen() {
                 <Ionicons name="pulse" size={24} color={ui.activeText} />
               </Pressable>
             </View>
+            </View>
+            ) : null}
 
             <ImportantInfoModal
               visible={showImportantInfo}
@@ -1080,6 +1211,21 @@ function HomeScreen() {
                 sectionLabelBg: ui.sectionLabelBg,
               }}
               onClose={() => setShowImportantInfo(false)}
+            />
+
+            <MedicationIntakeLegendModal
+              visible={showMedicationIntakeLegend}
+              labels={t}
+              theme={{
+                text: theme.text,
+                textSecondary: theme.textSecondary,
+                activeBg: ui.activeBg,
+                activeText: ui.activeText,
+                modalOverlay: ui.modalOverlay,
+                modalBg: ui.modalBg,
+                subtlePanelBorder: ui.subtlePanelBorder,
+              }}
+              onClose={() => setShowMedicationIntakeLegend(false)}
             />
 
             <OnboardingModal
@@ -1175,111 +1321,116 @@ function HomeScreen() {
                     </Pressable>
                   </View>
 
-                  <View style={styles.yearStepperRow}>
-                    <Pressable
-                      onPress={() => setCurrentDate(subYears(currentDate, 1))}
-                      style={({ pressed }) => [
-                        styles.yearNavButton,
-                        { backgroundColor: ui.circleBg, borderColor: ui.circleBorder, shadowOpacity: ui.circleShadow },
-                        pressed && styles.pressed,
-                      ]}>
-                      <Ionicons name="chevron-back" size={24} color={ui.icon} />
-                    </Pressable>
-                    <View style={styles.yearTitleWrap}>
-                      <Text style={[styles.yearTitleText, { color: theme.text }]}>{format(currentDate, 'yyyy')}</Text>
+                  <ScrollView
+                    style={styles.monthPickerScroll}
+                    contentContainerStyle={styles.monthPickerScrollContent}
+                    showsVerticalScrollIndicator={false}>
+                    <View style={styles.yearStepperRow}>
                       <Pressable
-                        onPress={() => {
-                          setCurrentDate(new Date());
-                          setShowMonthPicker(false);
-                        }}
+                        onPress={() => setCurrentDate(subYears(currentDate, 1))}
                         style={({ pressed }) => [
-                          styles.todayButton,
+                          styles.yearNavButton,
                           { backgroundColor: ui.circleBg, borderColor: ui.circleBorder, shadowOpacity: ui.circleShadow },
                           pressed && styles.pressed,
                         ]}>
-                        <Text style={[styles.todayButtonText, { color: theme.text }]}>{t.today}</Text>
+                        <Ionicons name="chevron-back" size={24} color={ui.icon} />
                       </Pressable>
-                    </View>
-                    <Pressable
-                      onPress={() => setCurrentDate(addYears(currentDate, 1))}
-                      style={({ pressed }) => [
-                        styles.yearNavButton,
-                        { backgroundColor: ui.circleBg, borderColor: ui.circleBorder, shadowOpacity: ui.circleShadow },
-                        pressed && styles.pressed,
-                      ]}>
-                      <Ionicons name="chevron-forward" size={24} color={ui.icon} />
-                    </Pressable>
-                  </View>
-
-                  <View style={[styles.monthPickerDivider, { backgroundColor: ui.dayBorder }]} />
-
-                  <View style={[styles.reviewRow, { backgroundColor: ui.subtlePanelBg, borderColor: ui.subtlePanelBorder }]}>
-                    <View style={styles.reviewTextWrap}>
-                      <Text style={[styles.reviewTitle, { color: theme.text }]}>{t.reviewMode}</Text>
-                      <Text style={[styles.reviewSubText, { color: theme.textSecondary }]}>{t.reviewModeHint}</Text>
-                    </View>
-                    <Switch value={isReviewMode} onValueChange={setIsReviewMode} />
-                  </View>
-
-                  <View style={[styles.reviewRow, { backgroundColor: ui.subtlePanelBg, borderColor: ui.subtlePanelBorder }]}>
-                    <View style={styles.reviewTextWrap}>
-                      <Text style={[styles.reviewTitle, { color: theme.text }]}>{t.reminder}</Text>
-                      <Text style={[styles.reviewSubText, { color: theme.textSecondary }]}>{t.reminderHint}</Text>
-                    </View>
-                    <Pressable
-                      onPress={() => void ensureNotificationPermissions()}
-                      style={({ pressed }) => [
-                        styles.reminderSetupBtn,
-                        { backgroundColor: ui.activeBg },
-                        pressed && styles.pressed,
-                      ]}>
-                      <Ionicons name="notifications-outline" size={16} color={ui.activeText} />
-                    </Pressable>
-                  </View>
-
-                  <Pressable
-                    onPress={() => {
-                      wellnessStore.resetOnboarding();
-                      setShowMonthPicker(false);
-                    }}
-                    style={({ pressed }) => [
-                      styles.onboardingAgainBtn,
-                      { backgroundColor: ui.circleBg, borderColor: ui.circleBorder },
-                      pressed && styles.pressed,
-                    ]}>
-                    <Ionicons name="school-outline" size={16} color={ui.icon} />
-                    <Text style={[styles.onboardingAgainText, { color: theme.text }]}>{t.showOnboardingAgain}</Text>
-                  </Pressable>
-
-                  <View style={styles.monthsGrid}>
-                    {MONTHS.map((m) => {
-                      const date = new Date(currentDate.getFullYear(), m, 1);
-                      const isActive = currentDate.getMonth() === m;
-                      return (
+                      <View style={styles.yearTitleWrap}>
+                        <Text style={[styles.yearTitleText, { color: theme.text }]}>{format(currentDate, 'yyyy')}</Text>
                         <Pressable
-                          key={m}
                           onPress={() => {
-                            setCurrentDate(date);
+                            setCurrentDate(new Date());
                             setShowMonthPicker(false);
                           }}
                           style={({ pressed }) => [
-                            styles.monthButton,
-                            isActive
-                              ? [styles.monthButtonActive, { backgroundColor: ui.activeBg, borderColor: ui.activeBg }]
-                              : [styles.monthButtonInactive, { backgroundColor: ui.inactiveBg, borderColor: ui.inactiveBorder }],
+                            styles.todayButton,
+                            { backgroundColor: ui.circleBg, borderColor: ui.circleBorder, shadowOpacity: ui.circleShadow },
                             pressed && styles.pressed,
                           ]}>
-                          <Text
-                            style={[
-                              isActive ? styles.monthButtonTextActive : styles.monthButtonTextInactive,
-                              { color: isActive ? ui.activeText : ui.inactiveText },
-                            ]}>
-                            {format(date, 'MMMM', { locale })}
-                          </Text>
+                          <Text style={[styles.todayButtonText, { color: theme.text }]}>{t.today}</Text>
                         </Pressable>
-                      );
-                    })}
-                  </View>
+                      </View>
+                      <Pressable
+                        onPress={() => setCurrentDate(addYears(currentDate, 1))}
+                        style={({ pressed }) => [
+                          styles.yearNavButton,
+                          { backgroundColor: ui.circleBg, borderColor: ui.circleBorder, shadowOpacity: ui.circleShadow },
+                          pressed && styles.pressed,
+                        ]}>
+                        <Ionicons name="chevron-forward" size={24} color={ui.icon} />
+                      </Pressable>
+                    </View>
+
+                    <View style={[styles.monthPickerDivider, { backgroundColor: ui.dayBorder }]} />
+
+                    <View style={[styles.reviewRow, { backgroundColor: ui.subtlePanelBg, borderColor: ui.subtlePanelBorder }]}>
+                      <View style={styles.reviewTextWrap}>
+                        <Text style={[styles.reviewTitle, { color: theme.text }]}>{t.reviewMode}</Text>
+                        <Text style={[styles.reviewSubText, { color: theme.textSecondary }]}>{t.reviewModeHint}</Text>
+                      </View>
+                      <Switch value={isReviewMode} onValueChange={setIsReviewMode} />
+                    </View>
+
+                    <View style={[styles.reviewRow, { backgroundColor: ui.subtlePanelBg, borderColor: ui.subtlePanelBorder }]}>
+                      <View style={styles.reviewTextWrap}>
+                        <Text style={[styles.reviewTitle, { color: theme.text }]}>{t.reminder}</Text>
+                        <Text style={[styles.reviewSubText, { color: theme.textSecondary }]}>{t.reminderHint}</Text>
+                      </View>
+                      <Pressable
+                        onPress={() => void ensureNotificationPermissions()}
+                        style={({ pressed }) => [
+                          styles.reminderSetupBtn,
+                          { backgroundColor: ui.activeBg },
+                          pressed && styles.pressed,
+                        ]}>
+                        <Ionicons name="notifications-outline" size={16} color={ui.activeText} />
+                      </Pressable>
+                    </View>
+
+                    <Pressable
+                      onPress={() => {
+                        wellnessStore.resetOnboarding();
+                        setShowMonthPicker(false);
+                      }}
+                      style={({ pressed }) => [
+                        styles.onboardingAgainBtn,
+                        { backgroundColor: ui.circleBg, borderColor: ui.circleBorder },
+                        pressed && styles.pressed,
+                      ]}>
+                      <Ionicons name="school-outline" size={16} color={ui.icon} />
+                      <Text style={[styles.onboardingAgainText, { color: theme.text }]}>{t.showOnboardingAgain}</Text>
+                    </Pressable>
+
+                    <View style={styles.monthsGrid}>
+                      {MONTHS.map((m) => {
+                        const date = new Date(currentDate.getFullYear(), m, 1);
+                        const isActive = currentDate.getMonth() === m;
+                        return (
+                          <Pressable
+                            key={m}
+                            onPress={() => {
+                              setCurrentDate(date);
+                              setShowMonthPicker(false);
+                            }}
+                            style={({ pressed }) => [
+                              styles.monthButton,
+                              isActive
+                                ? [styles.monthButtonActive, { backgroundColor: ui.activeBg, borderColor: ui.activeBg }]
+                                : [styles.monthButtonInactive, { backgroundColor: ui.inactiveBg, borderColor: ui.inactiveBorder }],
+                              pressed && styles.pressed,
+                            ]}>
+                            <Text
+                              style={[
+                                isActive ? styles.monthButtonTextActive : styles.monthButtonTextInactive,
+                                { color: isActive ? ui.activeText : ui.inactiveText },
+                              ]}>
+                              {formatMonthName(date, locale)}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </ScrollView>
                 </View>
               </Animated.View>
             ) : null}
@@ -1477,7 +1628,21 @@ function HomeScreen() {
           </View>
         </View>
       </SafeAreaView>
-    </View>
+      </View>
+
+      {nightObservationDateKey ? (
+        <SleepNightObservationOverlay
+          labels={t}
+          onClose={() => setNightObservationDateKey(null)}
+          onFinish={(nightLog) => {
+            const day = wellnessStore.getDay(nightObservationDateKey);
+            const merged = mergeNightObservationIntoSleepLog(parseSleepLog(day.sleep), nightLog);
+            wellnessStore.updateDayField(nightObservationDateKey, 'sleep', serializeSleepLog(merged));
+            setNightObservationDateKey(null);
+          }}
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -1492,19 +1657,26 @@ const styles = StyleSheet.create({
     borderLeftWidth: 1,
     borderRightWidth: 1,
     borderRadius: 0,
-    overflow: 'hidden',
-    elevation: 2,
+    overflow: 'visible',
   },
+  cardSurface: Platform.select({
+    android: { elevation: 0 },
+    default: { elevation: 2 },
+  }),
   header: { paddingTop: 24, paddingBottom: 12, paddingHorizontal: 24 },
   stickyHeader: {
     zIndex: 2,
     borderBottomWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 4,
+    elevation: 3,
   },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   monthPickerButton: { flex: 1, alignItems: 'center', paddingHorizontal: 8 },
-  monthTitle: { fontSize: 22, fontWeight: '500', letterSpacing: 2, textTransform: 'uppercase', textAlign: 'center' },
-  monthTitleCompact: { fontSize: 16, letterSpacing: 1 },
-  monthYear: { marginTop: 6, fontSize: 12, fontFamily: Fonts.mono, textAlign: 'center' },
+  monthTitle: { ...weekMonthTitleStyle, textAlign: 'center' },
+  monthTitleCompact: { fontSize: 22 },
+  monthYear: { ...weekYearStyle, marginTop: 4, textAlign: 'center' },
   circleButton: {
     width: 40,
     height: 40,
@@ -1518,15 +1690,11 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   pressed: { transform: [{ scale: 0.95 }] },
-  tableHeaderRow: { flexDirection: 'row', paddingVertical: 10, paddingHorizontal: 16 },
-  colDelete: { width: 28, flexShrink: 0 },
-  colTime: { width: 56, alignItems: 'center' },
-  colMed: { flex: 1, alignItems: 'center' },
-  colStatus: { width: 56, alignItems: 'center' },
-  tableHeaderText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
   scroll: { flex: 1 },
   scrollContent: { paddingBottom: 32 },
-  daySection: {},
+  daySection: {
+    marginBottom: 24,
+  },
   dayDivider: {
     height: StyleSheet.hairlineWidth,
     alignSelf: 'stretch',
@@ -1538,13 +1706,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
   },
-  dayHeaderTextWrap: { flex: 1, flexDirection: 'row' },
-  dayHeaderText: { fontSize: 12, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase' },
-  dayHeaderSubText: { marginLeft: 4, fontSize: 12, fontWeight: '800', fontFamily: Fonts.mono },
-  todayDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
+  dayHeaderTextWrap: { flex: 1, flexDirection: 'row', alignItems: 'center' },
+  dayHeaderText: { ...dayHeaderTitleStyle, lineHeight: 26 },
+  dayHeaderSubText: { ...weekDateStyle, marginLeft: 6, lineHeight: 26 },
+  todayWalkingGif: {
+    width: 26,
+    height: 22,
     marginLeft: 8,
     alignSelf: 'center',
   },
@@ -1560,26 +1727,47 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
   },
-  blockTitle: {
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 4,
-  },
-  row: { flexDirection: 'row', borderBottomWidth: 1 },
-  colDeleteCell: {
-    width: 28,
-    flexShrink: 0,
+  medicationsBlockHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 6,
+  },
+  medicationsHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  medicationsHeaderText: {
+    ...dayMedicationsHeaderStyle,
+  },
+  medicationsHeaderStatusText: {
+    ...dayMedicationsStatusStyle,
+  },
+  medicationsHeaderStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  row: { borderBottomWidth: 1 },
+  medicationRowMain: { flexDirection: 'row' },
+  medicationRowMeta: {
+    minHeight: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    paddingLeft: 8,
+    paddingRight: 12,
+    paddingBottom: 8,
   },
   deleteBtn: {
-    width: 24,
-    height: 24,
+    width: 20,
+    height: 20,
+    borderRadius: 12,
+  
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1596,9 +1784,9 @@ const styles = StyleSheet.create({
     minWidth: 44,
   },
   timeText: {
-    fontSize: 12,
+    ...weekServiceTextStyle,
     fontFamily: Fonts.mono,
-    fontWeight: '700',
+    letterSpacing: 0,
   },
   colMedCell: {
     flex: 1,
@@ -1609,28 +1797,65 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
   },
+  medicationPlaceholderText: {
+    ...weekServiceTextStyle,
+  },
+  medicationSplitInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    minWidth: 0,
+  },
+  medicationNameInput: {
+    ...weekBodyTextStyle,
+    flex: 1,
+    minWidth: 0,
+    lineHeight: 20,
+    paddingVertical: 0,
+    paddingHorizontal: 0,
+  },
+  medicationDoseInput: {
+    ...weekBodyTextStyle,
+    width: 64,
+    lineHeight: 20,
+    paddingVertical: 0,
+    paddingHorizontal: 0,
+  },
   colReminderCell: {
     width: 28,
     flexShrink: 0,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 10,
+    paddingRight: 10,
   },
   colCheckCell: {
-    width: 28,
+    width: 44,
     flexShrink: 0,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 10,
+    paddingRight: 4,
   },
-  takenStatusWrap: {
+  takenMetaWrap: {
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: 2,
+    justifyContent: 'flex-end',
+    gap: 8,
+    minWidth: 44,
   },
   takenAtText: {
     fontSize: 8,
     fontFamily: Fonts.mono,
     lineHeight: 10,
+    textAlign: 'center',
+  },
+  takenIntakeNumberText: {
+    fontSize: 12,
+    fontFamily: Fonts.mono,
+    lineHeight: 14,
+    fontWeight: '500',
+    textAlign: 'center',
   },
   reminderButton: {
     width: 28,
@@ -1644,44 +1869,65 @@ const styles = StyleSheet.create({
   checkOff: { borderWidth: 1 },
   checkSkipped: { borderWidth: 1 },
   dayNotesGroup: { borderTopWidth: 1 },
+  dayNotesSections: {
+    marginHorizontal: 12,
+    marginBottom: 10,
+    gap: 12,
+  },
+  dayNotesSectionCard: {
+    borderWidth: 1,
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
   dayNotesBody: {
     marginHorizontal: 12,
+    marginTop: 12,
     marginBottom: 8,
     borderWidth: 1,
     borderRadius: 8,
     overflow: 'hidden',
   },
   dayNotesHeader: {
-    flexDirection: 'row',
+    minHeight: 58,
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     paddingHorizontal: 16,
     paddingTop: 10,
-    paddingBottom: 8,
+    paddingBottom: 24,
   },
-  dayNotesHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  dayNotesTitleRow: {
+    position: 'absolute',
+    top: 10,
+    left: 48,
+    right: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
   dayNotesTitle: {
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 2,
-    textTransform: 'uppercase',
+    ...weekCardTitleStyle,
+    fontSize: 18,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  dayNotesCaret: {
+    position: 'absolute',
+    bottom: 3,
+    alignSelf: 'center',
   },
   dayNotesDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
   },
-  sectionBlock: { borderBottomWidth: 1 },
   sectionLabel: {
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 2,
-    textTransform: 'uppercase',
+    ...daySectionLabelStyle,
     paddingHorizontal: 16,
     paddingTop: 10,
     paddingBottom: 6,
   },
-  sectionInputWrap: { paddingHorizontal: 16, paddingBottom: 12 },
+  sectionInputWrap: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 12 },
   weeklyNotesWrap: { paddingHorizontal: 10, paddingTop: 18 },
   weeklyNudgeBanner: {
     flexDirection: 'row',
@@ -1693,7 +1939,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     marginBottom: 10,
   },
-  weeklyNudgeText: { flex: 1, fontSize: 12, lineHeight: 17 },
+  weeklyNudgeText: { ...weekBodyTextStyle, flex: 1, lineHeight: 22 },
   weeklyNotesHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1702,11 +1948,8 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   weeklyNotesTitle: {
+    ...weekCardTitleStyle,
     flex: 1,
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 2,
-    textTransform: 'uppercase',
     paddingBottom: 4,
     borderBottomWidth: 1,
   },
@@ -1720,20 +1963,43 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   weeklyExportButtonText: {
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
+    ...weekButtonTextStyle,
   },
   weeklyInput: { minHeight: 96 },
+  footerChrome: {
+    position: 'relative',
+    borderTopWidth: 1,
+    zIndex: 2,
+  },
+  footerUpShadow: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    height: 1,
+    zIndex: 1,
+  },
+  footerUpShadowBand: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: '#000',
+  },
   footer: {
     paddingHorizontal: 12,
     paddingVertical: 10,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'stretch',
-    borderTopWidth: 1,
     gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -3 },
+    shadowRadius: 4,
+    ...Platform.select({
+      android: { elevation: 0 },
+      default: { elevation: 3 },
+    }),
   },
   footerActions: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 },
   panicButton: {
@@ -1764,8 +2030,8 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   footerIconButtonIconOnly: { width: 36, paddingHorizontal: 0 },
-  footerIconLabel: { fontSize: 9, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase' },
-  footerIconLabelCompact: { fontSize: 7, letterSpacing: 0.3, maxWidth: 72, textAlign: 'center' },
+  footerIconLabel: { ...weekServiceTextStyle },
+  footerIconLabelCompact: { fontSize: 10, letterSpacing: 0.3, maxWidth: 72, textAlign: 'center' },
   modalOverlayFullScreen: {
     position: 'absolute',
     top: 0,
@@ -1776,7 +2042,9 @@ const styles = StyleSheet.create({
   },
   modalCardFullScreen: { flex: 1, paddingHorizontal: 24, paddingTop: 18, paddingBottom: 18 },
   modalHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
-  modalTitle: { fontSize: 12, fontWeight: '800', letterSpacing: 3, textTransform: 'uppercase' },
+  modalTitle: { ...sectionTitleStyle, fontSize: 15, fontWeight: '600' },
+  monthPickerScroll: { flex: 1 },
+  monthPickerScrollContent: { paddingBottom: 24 },
   yearStepperRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
   monthPickerDivider: { height: 1, marginVertical: 24 },
   yearNavButton: {
@@ -1804,7 +2072,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
     elevation: 4,
   },
-  todayButtonText: { fontSize: 10, fontWeight: '900', letterSpacing: 2, textTransform: 'uppercase' },
+  todayButtonText: { ...weekButtonTextStyle },
   reviewRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1816,8 +2084,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   reviewTextWrap: { flex: 1, paddingRight: 12 },
-  reviewTitle: { fontSize: 10, fontWeight: '900', letterSpacing: 2, textTransform: 'uppercase' },
-  reviewSubText: { marginTop: 4, fontSize: 8, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
+  reviewTitle: { ...weekFieldLabelStyle },
+  reviewSubText: { marginTop: 4, fontSize: 11, lineHeight: 15 },
   reminderSetupBtn: {
     width: 40,
     height: 40,
@@ -1836,7 +2104,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
   },
-  onboardingAgainText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.5, textTransform: 'uppercase' },
+  onboardingAgainText: { ...weekButtonTextStyle },
   monthsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   monthButton: {
     width: '48%',
@@ -1851,8 +2119,8 @@ const styles = StyleSheet.create({
   },
   monthButtonActive: {},
   monthButtonInactive: {},
-  monthButtonTextActive: { fontSize: 10, fontWeight: '600', letterSpacing: 2, textTransform: 'uppercase' },
-  monthButtonTextInactive: { fontSize: 10, fontWeight: '600', letterSpacing: 2, textTransform: 'uppercase' },
+  monthButtonTextActive: { ...weekFieldLabelStyle },
+  monthButtonTextInactive: { ...weekFieldLabelStyle },
   langModalOverlay: { flex: 1, alignItems: 'center', justifyContent: 'center', zIndex: 100 },
   langModalCard: { width: '85%', paddingHorizontal: 24, paddingVertical: 18, borderRadius: 18, borderWidth: 1 },
   langList: { marginTop: 10, gap: 10 },

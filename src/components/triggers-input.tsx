@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import type { AppLabels, Language } from '@/constants/i18n';
+import { formatSectionTitle, daySectionLabelStyle, weekBodyTextStyle, weekButtonTextStyle, weekFieldLabelStyle } from '@/constants/typography';
 import { TRIGGER_CATEGORIES } from '@/constants/trigger-catalog';
 import { getTriggerCategoryLabel, getTriggerLabel } from '@/constants/trigger-labels';
 import {
@@ -37,16 +38,11 @@ type Props = {
 };
 
 export function TriggersInput({ label, value, language, labels, theme, onChange }: Props) {
-  const [log, setLog] = useState<TriggerLog>(() => parseTriggerLog(value));
+  const log = useMemo(() => parseTriggerLog(value), [value]);
   const [pickerExpanded, setPickerExpanded] = useState(false);
   const [customDraft, setCustomDraft] = useState('');
 
-  useEffect(() => {
-    setLog(parseTriggerLog(value));
-  }, [value]);
-
   const updateLog = (nextLog: TriggerLog) => {
-    setLog(nextLog);
     onChange(serializeTriggerLog(nextLog));
   };
 
@@ -77,9 +73,9 @@ export function TriggersInput({ label, value, language, labels, theme, onChange 
   };
 
   return (
-    <View style={[styles.sectionBlock, { borderColor: theme.rowBorder }]}>
-      <Text style={[styles.sectionLabel, { color: theme.textSecondary, backgroundColor: theme.sectionLabelBg }]}>
-        {label}
+    <View style={styles.sectionBlock}>
+      <Text style={[styles.sectionLabel, { backgroundColor: theme.sectionLabelBg }]}>
+        {formatSectionTitle(label)}
       </Text>
 
       <View style={styles.content}>
@@ -101,12 +97,14 @@ export function TriggersInput({ label, value, language, labels, theme, onChange 
         <Pressable
           onPress={() => setPickerExpanded((v) => !v)}
           style={({ pressed }) => [
-            styles.pickerToggle,
-            { borderTopColor: hasSelected ? theme.rowBorder : 'transparent' },
+            styles.pickerToggleButton,
+            { borderColor: theme.inactiveBorder, backgroundColor: theme.inactiveBg },
             pressed && styles.pressed,
           ]}>
-          <Text style={[styles.pickerToggleTitle, { color: theme.textSecondary }]}>{labels.triggersPossible}</Text>
-          <Ionicons name={pickerExpanded ? 'chevron-up' : 'chevron-down'} size={14} color={theme.iconMuted} />
+          <Ionicons name="add-circle-outline" size={16} color={theme.activeBg} />
+          <Text style={[styles.pickerToggleTitle, { color: theme.activeBg }]}>
+            {labels.triggersPossible.toLocaleLowerCase()}
+          </Text>
         </Pressable>
 
         {pickerExpanded ? (
@@ -128,7 +126,9 @@ export function TriggersInput({ label, value, language, labels, theme, onChange 
             ))}
 
             <View style={styles.customBlock}>
-              <Text style={[styles.categoryTitle, { color: theme.textSecondary }]}>{labels.triggerCustomTitle}</Text>
+              <Text style={[styles.categoryTitle, { color: theme.textSecondary }]}>
+                {formatSectionTitle(labels.triggerCustomTitle)}
+              </Text>
               <View style={styles.customRow}>
                 <TextInput
                   value={customDraft}
@@ -170,18 +170,16 @@ export function TriggersInput({ label, value, language, labels, theme, onChange 
 }
 
 const styles = StyleSheet.create({
-  sectionBlock: { borderBottomWidth: 1 },
+  sectionBlock: {},
   sectionLabel: {
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 2,
-    textTransform: 'uppercase',
+    ...daySectionLabelStyle,
     paddingHorizontal: 16,
     paddingTop: 10,
     paddingBottom: 6,
   },
   content: {
     paddingHorizontal: 16,
+    paddingTop: 10,
     paddingBottom: 12,
     gap: 8,
   },
@@ -190,18 +188,18 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 6,
   },
-  pickerToggle: {
+  pickerToggleButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 2,
-    borderTopWidth: StyleSheet.hairlineWidth,
+    justifyContent: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
   },
   pickerToggleTitle: {
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 2,
-    textTransform: 'uppercase',
+    ...weekBodyTextStyle,
   },
   pickerBody: {
     gap: 12,
@@ -210,10 +208,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   categoryTitle: {
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
+    ...weekFieldLabelStyle,
   },
   chipGrid: {
     flexDirection: 'row',
@@ -227,8 +222,9 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   chipText: {
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 13,
+    fontWeight: '400',
+    lineHeight: 17,
   },
   customBlock: {
     gap: 6,
@@ -245,7 +241,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    fontSize: 13,
+    ...weekBodyTextStyle,
   },
   customAddButton: {
     borderWidth: 1,
@@ -254,8 +250,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   customAddText: {
-    fontSize: 12,
-    fontWeight: '700',
+    ...weekButtonTextStyle,
   },
   pressed: { opacity: 0.7 },
 });

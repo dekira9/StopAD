@@ -1,11 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { AppLabels } from '@/constants/i18n';
 import { Fonts } from '@/constants/theme';
 import type { MedicationRepeatConfig } from '@/stores/wellness-store';
-import { buildRepeatFromIntakeMode, getIntakeMode } from '@/utils/medication-intake';
+import { buildRepeatFromIntakeMode, getIntakeMode, type IntakeMode } from '@/utils/medication-intake';
 
 const WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0] as const;
 const INTERVAL_OPTIONS = [2, 3, 4, 5, 7] as const;
@@ -23,8 +23,6 @@ type ThemeSlice = {
   subtlePanelBorder: string;
 };
 
-type IntakeMode = 'everyDay' | 'weekdays' | 'interval';
-
 type Props = {
   visible: boolean;
   embedded?: boolean;
@@ -36,29 +34,27 @@ type Props = {
   onApply: (repeat: MedicationRepeatConfig) => void;
 };
 
-export function MedicationIntakeDaysModal({
-  visible,
-  embedded = false,
+type ContentProps = Omit<Props, 'visible' | 'embedded'>;
+
+function getInitialDaysOfWeek(initialRepeat: MedicationRepeatConfig): number[] {
+  return initialRepeat.everyDay ? [1] : initialRepeat.daysOfWeek.length > 0 ? [...initialRepeat.daysOfWeek] : [1];
+}
+
+function getInitialIntervalDays(initialRepeat: MedicationRepeatConfig): number {
+  return initialRepeat.intervalDays && initialRepeat.intervalDays >= 2 ? initialRepeat.intervalDays : 2;
+}
+
+function MedicationIntakeDaysModalContent({
   labels,
   theme,
   weekdayLabels,
   initialRepeat,
   onClose,
   onApply,
-}: Props) {
-  const [mode, setMode] = useState<IntakeMode>('everyDay');
-  const [daysOfWeek, setDaysOfWeek] = useState<number[]>([1]);
-  const [intervalDays, setIntervalDays] = useState<number>(2);
-
-  useEffect(() => {
-    if (!visible) return;
-    const nextMode = getIntakeMode(initialRepeat);
-    setMode(nextMode);
-    setDaysOfWeek(
-      initialRepeat.everyDay ? [1] : initialRepeat.daysOfWeek.length > 0 ? [...initialRepeat.daysOfWeek] : [1],
-    );
-    setIntervalDays(initialRepeat.intervalDays && initialRepeat.intervalDays >= 2 ? initialRepeat.intervalDays : 2);
-  }, [visible, initialRepeat]);
+}: ContentProps) {
+  const [mode, setMode] = useState<IntakeMode>(() => getIntakeMode(initialRepeat));
+  const [daysOfWeek, setDaysOfWeek] = useState<number[]>(() => getInitialDaysOfWeek(initialRepeat));
+  const [intervalDays, setIntervalDays] = useState<number>(() => getInitialIntervalDays(initialRepeat));
 
   const toggleDay = (dow: number) => {
     setDaysOfWeek((prev) => {
@@ -74,7 +70,7 @@ export function MedicationIntakeDaysModal({
     });
   };
 
-  const canApply = mode === 'everyDay' || mode === 'interval' || daysOfWeek.length > 0;
+  const canApply = mode === 'everyDay' || mode === 'interval' || mode === 'monthly' || daysOfWeek.length > 0;
 
   const renderModeOption = (option: IntakeMode, label: string) => {
     const active = mode === option;
@@ -95,7 +91,7 @@ export function MedicationIntakeDaysModal({
     );
   };
 
-  const content = (
+  return (
     <Pressable style={[styles.overlay, { backgroundColor: theme.modalOverlay }]} onPress={onClose}>
       <Pressable
         style={[styles.card, { backgroundColor: theme.modalBg, borderColor: theme.subtlePanelBorder }]}
@@ -152,6 +148,8 @@ export function MedicationIntakeDaysModal({
           </View>
         ) : null}
 
+        {renderModeOption('monthly', labels.medicationIntakeMonthly)}
+
         <View style={styles.actions}>
           <Pressable
             onPress={onClose}
@@ -174,15 +172,50 @@ export function MedicationIntakeDaysModal({
       </Pressable>
     </Pressable>
   );
+}
+
+export function MedicationIntakeDaysModal({
+  visible,
+  embedded = false,
+  labels,
+  theme,
+  weekdayLabels,
+  initialRepeat,
+  onClose,
+  onApply,
+}: Props) {
+  const key = `${getIntakeMode(initialRepeat)}-${initialRepeat.everyDay}-${initialRepeat.daysOfWeek.join(',')}-${initialRepeat.intervalDays ?? ''}-${initialRepeat.intervalMonths ?? ''}`;
 
   if (embedded) {
     if (!visible) return null;
-    return <View style={styles.embeddedRoot}>{content}</View>;
+    return (
+      <View style={styles.embeddedRoot}>
+        <MedicationIntakeDaysModalContent
+          key={key}
+          labels={labels}
+          theme={theme}
+          weekdayLabels={weekdayLabels}
+          initialRepeat={initialRepeat}
+          onClose={onClose}
+          onApply={onApply}
+        />
+      </View>
+    );
   }
 
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
-      {content}
+      {visible ? (
+        <MedicationIntakeDaysModalContent
+          key={key}
+          labels={labels}
+          theme={theme}
+          weekdayLabels={weekdayLabels}
+          initialRepeat={initialRepeat}
+          onClose={onClose}
+          onApply={onApply}
+        />
+      ) : null}
     </Modal>
   );
 }

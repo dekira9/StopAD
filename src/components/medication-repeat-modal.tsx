@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { addDays } from 'date-fns';
-import React, { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { AppLabels } from '@/constants/i18n';
@@ -37,8 +37,25 @@ type Props = {
   onApply: (config: MedicationRepeatConfig) => void;
 };
 
-export function MedicationRepeatModal({
-  visible,
+type ContentProps = Omit<Props, 'visible'>;
+
+function getInitialRepeatState(initialRepeat: MedicationRepeatConfig | undefined, initialDayOfWeek: number) {
+  if (initialRepeat) {
+    return {
+      months: initialRepeat.months,
+      everyDay: initialRepeat.everyDay,
+      daysOfWeek: initialRepeat.everyDay ? [initialDayOfWeek] : [...initialRepeat.daysOfWeek],
+    };
+  }
+
+  return {
+    months: 1,
+    everyDay: true,
+    daysOfWeek: [initialDayOfWeek],
+  };
+}
+
+function MedicationRepeatModalContent({
   labels,
   theme,
   weekdayLabels,
@@ -46,23 +63,11 @@ export function MedicationRepeatModal({
   initialRepeat,
   onClose,
   onApply,
-}: Props) {
-  const [months, setMonths] = useState<number>(1);
-  const [everyDay, setEveryDay] = useState(true);
-  const [daysOfWeek, setDaysOfWeek] = useState<number[]>([initialDayOfWeek]);
-
-  useEffect(() => {
-    if (!visible) return;
-    if (initialRepeat) {
-      setMonths(initialRepeat.months);
-      setEveryDay(initialRepeat.everyDay);
-      setDaysOfWeek(initialRepeat.everyDay ? [initialDayOfWeek] : [...initialRepeat.daysOfWeek]);
-      return;
-    }
-    setMonths(1);
-    setEveryDay(true);
-    setDaysOfWeek([initialDayOfWeek]);
-  }, [visible, initialDayOfWeek, initialRepeat]);
+}: ContentProps) {
+  const initialState = getInitialRepeatState(initialRepeat, initialDayOfWeek);
+  const [months, setMonths] = useState<number>(initialState.months);
+  const [everyDay, setEveryDay] = useState(initialState.everyDay);
+  const [daysOfWeek, setDaysOfWeek] = useState<number[]>(initialState.daysOfWeek);
 
   const canApply = everyDay || daysOfWeek.length > 0;
 
@@ -79,7 +84,6 @@ export function MedicationRepeatModal({
   };
 
   return (
-    <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
       <Pressable style={[styles.overlay, { backgroundColor: theme.modalOverlay }]} onPress={onClose}>
         <Pressable style={[styles.card, { backgroundColor: theme.modalBg, borderColor: theme.subtlePanelBorder }]} onPress={() => {}}>
           <Text style={[styles.title, { color: theme.textSecondary }]}>{labels.repeatMedication}</Text>
@@ -187,6 +191,16 @@ export function MedicationRepeatModal({
           </View>
         </Pressable>
       </Pressable>
+  );
+}
+
+export function MedicationRepeatModal({ visible, ...contentProps }: Props) {
+  const repeat = contentProps.initialRepeat;
+  const key = `${contentProps.initialDayOfWeek}-${repeat?.months ?? 1}-${repeat?.everyDay ?? true}-${repeat?.daysOfWeek.join(',') ?? ''}`;
+
+  return (
+    <Modal transparent visible={visible} animationType="fade" onRequestClose={contentProps.onClose}>
+      {visible ? <MedicationRepeatModalContent key={key} {...contentProps} /> : null}
     </Modal>
   );
 }

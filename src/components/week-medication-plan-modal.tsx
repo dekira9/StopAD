@@ -73,6 +73,9 @@ export function formatRepeatSummary(
   weekdayLabels: string[],
 ): string {
   const duration = `${repeat.months} ${labels.repeatMonthsUnit}`;
+  if (repeat.intervalMonths && repeat.intervalMonths >= 1) {
+    return `${duration} · ${labels.medicationIntakeMonthly}`;
+  }
   if (repeat.intervalDays && repeat.intervalDays >= 2) {
     return `${duration} · ${labels.medicationIntakeIntervalEvery.replace('{n}', String(repeat.intervalDays))}`;
   }

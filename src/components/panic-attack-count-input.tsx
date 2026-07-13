@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { getPanicAttackDayInfoLines } from '@/constants/panic-attack-day-info';
 import type { AppLabels, Language } from '@/constants/i18n';
-import { Fonts } from '@/constants/theme';
+import { formatSectionTitle, daySectionLabelStyle, weekBodyTextStyle, weekServiceTextStyle } from '@/constants/typography';
 
 type ThemeSlice = {
   text: string;
@@ -16,7 +16,6 @@ type ThemeSlice = {
   inactiveText: string;
   rowBorder: string;
   sectionLabelBg: string;
-  panicRowBg: string;
   iconMuted: string;
 };
 
@@ -37,9 +36,9 @@ export function PanicAttackCountInput({ label, count, language, labels, theme, o
   const increment = () => onChange(count + 1);
 
   return (
-    <View style={[styles.sectionBlock, { borderColor: theme.rowBorder, backgroundColor: theme.panicRowBg }]}>
-      <Text style={[styles.sectionLabel, { color: theme.textSecondary, backgroundColor: theme.sectionLabelBg }]}>
-        {label}
+    <View style={styles.sectionBlock}>
+      <Text style={[styles.sectionLabel, { backgroundColor: theme.sectionLabelBg }]}>
+        {formatSectionTitle(label)}
       </Text>
 
       <View style={styles.content}>
@@ -82,7 +81,7 @@ export function PanicAttackCountInput({ label, count, language, labels, theme, o
             pressed && styles.pressed,
           ]}>
           <Text style={[styles.infoToggleTitle, { color: theme.textSecondary }]}>{labels.panicAttackWhatToMark}</Text>
-          <Ionicons name={infoExpanded ? 'chevron-up' : 'chevron-down'} size={14} color={theme.iconMuted} />
+          <Ionicons name={infoExpanded ? 'caret-up' : 'caret-down'} size={18} color={theme.iconMuted} />
         </Pressable>
 
         {infoExpanded ? (
@@ -109,12 +108,9 @@ export function PanicAttackCountInput({ label, count, language, labels, theme, o
 }
 
 const styles = StyleSheet.create({
-  sectionBlock: { borderBottomWidth: 1 },
+  sectionBlock: {},
   sectionLabel: {
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 2,
-    textTransform: 'uppercase',
+    ...daySectionLabelStyle,
     paddingHorizontal: 16,
     paddingTop: 10,
     paddingBottom: 6,
@@ -125,19 +121,16 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   bodyText: {
-    fontSize: 12,
-    lineHeight: 18,
+    ...weekBodyTextStyle,
+    lineHeight: 22,
   },
   leadText: {
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
+    ...weekServiceTextStyle,
     marginTop: 4,
   },
   symptomText: {
-    fontSize: 12,
-    lineHeight: 18,
+    ...weekBodyTextStyle,
+    lineHeight: 22,
     paddingLeft: 4,
   },
   counterRow: {
@@ -168,14 +161,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   countValue: {
-    fontSize: 20,
-    fontFamily: Fonts.mono,
-    fontWeight: '800',
+    fontSize: 17,
+    fontWeight: '400',
   },
   counterHint: {
-    fontSize: 10,
+    fontSize: 12,
+    fontWeight: '500',
     textAlign: 'center',
-    lineHeight: 14,
+    lineHeight: 16,
     marginTop: 2,
   },
   infoToggle: {
@@ -187,10 +180,7 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   infoToggleTitle: {
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 2,
-    textTransform: 'uppercase',
+    ...weekServiceTextStyle,
   },
   infoBody: {
     gap: 6,

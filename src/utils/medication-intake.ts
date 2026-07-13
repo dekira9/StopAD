@@ -3,11 +3,16 @@ import type { MedicationRepeatConfig } from '@/stores/wellness-store';
 
 const WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0] as const;
 
+export type IntakeMode = 'everyDay' | 'weekdays' | 'interval' | 'monthly';
+
 export function formatIntakeDaysSummary(
   repeat: MedicationRepeatConfig,
   labels: AppLabels,
   weekdayLabels: string[],
 ): string {
+  if (repeat.intervalMonths && repeat.intervalMonths >= 1) {
+    return labels.medicationIntakeMonthly;
+  }
   if (repeat.intervalDays && repeat.intervalDays >= 2) {
     return labels.medicationIntakeIntervalEvery.replace('{n}', String(repeat.intervalDays));
   }
@@ -24,7 +29,8 @@ export function formatIntakeDaysSummary(
   return days || labels.repeatSelectedDays;
 }
 
-export function getIntakeMode(repeat: MedicationRepeatConfig): 'everyDay' | 'weekdays' | 'interval' {
+export function getIntakeMode(repeat: MedicationRepeatConfig): IntakeMode {
+  if (repeat.intervalMonths && repeat.intervalMonths >= 1) return 'monthly';
   if (repeat.intervalDays && repeat.intervalDays >= 2) return 'interval';
   if (repeat.everyDay) return 'everyDay';
   return 'weekdays';
@@ -32,7 +38,7 @@ export function getIntakeMode(repeat: MedicationRepeatConfig): 'everyDay' | 'wee
 
 export function buildRepeatFromIntakeMode(
   base: MedicationRepeatConfig,
-  mode: 'everyDay' | 'weekdays' | 'interval',
+  mode: IntakeMode,
   daysOfWeek: number[],
   intervalDays: number,
 ): MedicationRepeatConfig {
@@ -47,6 +53,7 @@ export function buildRepeatFromIntakeMode(
       everyDay: true,
       daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
       intervalDays: undefined,
+      intervalMonths: undefined,
       ...durationFields,
     };
   }
@@ -56,6 +63,17 @@ export function buildRepeatFromIntakeMode(
       everyDay: false,
       daysOfWeek: [],
       intervalDays: intervalDays,
+      intervalMonths: undefined,
+      ...durationFields,
+    };
+  }
+  if (mode === 'monthly') {
+    return {
+      months: base.months,
+      everyDay: false,
+      daysOfWeek: [],
+      intervalDays: undefined,
+      intervalMonths: 1,
       ...durationFields,
     };
   }
@@ -64,6 +82,7 @@ export function buildRepeatFromIntakeMode(
     everyDay: false,
     daysOfWeek: daysOfWeek.length > 0 ? daysOfWeek : [1],
     intervalDays: undefined,
+    intervalMonths: undefined,
     ...durationFields,
   };
 }
