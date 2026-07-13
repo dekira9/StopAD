@@ -26,9 +26,10 @@ type Props = {
   labels: AppLabels;
   theme: ThemeSlice;
   onChange: (count: number) => void;
+  hideLabel?: boolean;
 };
 
-export function PanicAttackCountInput({ label, count, language, labels, theme, onChange }: Props) {
+export function PanicAttackCountInput({ label, count, language, labels, theme, onChange, hideLabel }: Props) {
   const [infoExpanded, setInfoExpanded] = useState(false);
   const infoLines = useMemo(() => getPanicAttackDayInfoLines(language), [language]);
 
@@ -37,9 +38,11 @@ export function PanicAttackCountInput({ label, count, language, labels, theme, o
 
   return (
     <View style={styles.sectionBlock}>
-      <Text style={[styles.sectionLabel, { backgroundColor: theme.sectionLabelBg }]}>
-        {formatSectionTitle(label)}
-      </Text>
+      {hideLabel ? null : (
+        <Text style={[styles.sectionLabel, { backgroundColor: theme.sectionLabelBg }]}>
+          {formatSectionTitle(label)}
+        </Text>
+      )}
 
       <View style={styles.content}>
         <View style={styles.counterRow}>

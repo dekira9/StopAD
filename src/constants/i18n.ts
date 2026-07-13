@@ -186,6 +186,11 @@ export type AppLabels = {
   coachMarkNext: string;
   showOnboardingAgain: string;
   weeklySummaryNudge: string;
+  dayMedicationsProgress: string;
+  dayPanicPill: string;
+  nextDoseTitle: string;
+  medicationTake: string;
+  sleepAwakeningsSummary: string;
 };
 
 export const LANGUAGES: Record<
@@ -292,7 +297,7 @@ export const LANGUAGES: Record<
       medicationIntakeLegendTitle: 'Taken',
       medicationIntakeLegendBell: 'Bell — reminder to take medication.',
       medicationIntakeLegendSetTime: 'Set intake time',
-      medicationIntakeLegendCheck: 'Checkmark — medication taken.',
+      medicationIntakeLegendCheck: 'Button — mark medication as taken. Long-press for skip/schedule.',
       medicationIntakeLegendSchedule: 'Set intake schedule',
       medicationIntakeLegendTime: 'Time under the checkmark — when you marked it taken.',
       medicationIntakeLegendNumber: 'Number — how many doses you have taken on schedule since it started.',
@@ -384,6 +389,11 @@ export const LANGUAGES: Record<
       coachMarkNext: 'Next',
       showOnboardingAgain: 'Show onboarding again',
       weeklySummaryNudge: 'Sunday is a good day to review your week and note what stood out.',
+      dayMedicationsProgress: 'Meds {taken}/{total}',
+      dayPanicPill: 'PA · {n}',
+      nextDoseTitle: 'Next dose',
+      medicationTake: 'Take',
+      sleepAwakeningsSummary: '{n} awakening(s)',
     },
   },
   ru: {
@@ -486,7 +496,7 @@ export const LANGUAGES: Record<
       medicationIntakeLegendTitle: 'Принято',
       medicationIntakeLegendBell: 'Колокольчик — напоминание о приёме.',
       medicationIntakeLegendSetTime: 'Установка времени приема',
-      medicationIntakeLegendCheck: 'Галочка — лекарство принято.',
+      medicationIntakeLegendCheck: 'Кнопка — отметить приём. Долгое нажатие — пропуск/расписание.',
       medicationIntakeLegendSchedule: 'Установить график приема',
       medicationIntakeLegendTime: 'Время под галочкой — когда вы отметили приём.',
       medicationIntakeLegendNumber: 'Цифра — количество принятых таблеток по графику с начала графика.',
@@ -578,6 +588,11 @@ export const LANGUAGES: Record<
       coachMarkNext: 'Далее',
       showOnboardingAgain: 'Показать обучение снова',
       weeklySummaryNudge: 'Воскресенье — хороший день, чтобы подвести итоги недели и отметить главное.',
+      dayMedicationsProgress: 'Лекарства {taken}/{total}',
+      dayPanicPill: 'ПА · {n}',
+      nextDoseTitle: 'Следующий приём',
+      medicationTake: 'Принять',
+      sleepAwakeningsSummary: '{n} пробужд.',
     },
   },
   es: {
@@ -772,6 +787,11 @@ export const LANGUAGES: Record<
       coachMarkNext: 'Siguiente',
       showOnboardingAgain: 'Mostrar introducción de nuevo',
       weeklySummaryNudge: 'El domingo es buen día para repasar la semana y anotar lo más importante.',
+      dayMedicationsProgress: 'Meds {taken}/{total}',
+      dayPanicPill: 'AP · {n}',
+      nextDoseTitle: 'Próxima dosis',
+      medicationTake: 'Tomar',
+      sleepAwakeningsSummary: '{n} despertares',
     },
   },
   fr: {
@@ -966,6 +986,11 @@ export const LANGUAGES: Record<
       coachMarkNext: 'Suivant',
       showOnboardingAgain: 'Revoir l\'introduction',
       weeklySummaryNudge: 'Le dimanche est un bon jour pour faire le bilan de la semaine.',
+      dayMedicationsProgress: 'Médic. {taken}/{total}',
+      dayPanicPill: 'PC · {n}',
+      nextDoseTitle: 'Prochaine prise',
+      medicationTake: 'Prendre',
+      sleepAwakeningsSummary: '{n} réveil(s)',
     },
   },
   de: {
@@ -1160,6 +1185,11 @@ export const LANGUAGES: Record<
       coachMarkNext: 'Weiter',
       showOnboardingAgain: 'Einführung erneut anzeigen',
       weeklySummaryNudge: 'Sonntag ist ein guter Tag, die Woche zu reflektieren.',
+      dayMedicationsProgress: 'Med. {taken}/{total}',
+      dayPanicPill: 'PA · {n}',
+      nextDoseTitle: 'Nächste Dosis',
+      medicationTake: 'Einnehmen',
+      sleepAwakeningsSummary: '{n} Wachphase(n)',
     },
   },
   zh: {
@@ -1352,6 +1382,11 @@ export const LANGUAGES: Record<
       coachMarkNext: '下一步',
       showOnboardingAgain: '再次显示引导',
       weeklySummaryNudge: '周日适合回顾一周并记录要点。',
+      dayMedicationsProgress: '药物 {taken}/{total}',
+      dayPanicPill: '惊恐 · {n}',
+      nextDoseTitle: '下次服药',
+      medicationTake: '服用',
+      sleepAwakeningsSummary: '{n} 次醒来',
     },
   },
   pt: {
@@ -1546,6 +1581,11 @@ export const LANGUAGES: Record<
       coachMarkNext: 'Próximo',
       showOnboardingAgain: 'Mostrar introdução novamente',
       weeklySummaryNudge: 'Domingo é um bom dia para revisar a semana.',
+      dayMedicationsProgress: 'Meds {taken}/{total}',
+      dayPanicPill: 'AP · {n}',
+      nextDoseTitle: 'Próxima dose',
+      medicationTake: 'Tomar',
+      sleepAwakeningsSummary: '{n} despertares',
     },
   },
   it: {
@@ -1740,6 +1780,11 @@ export const LANGUAGES: Record<
       coachMarkNext: 'Avanti',
       showOnboardingAgain: 'Mostra di nuovo l\'introduzione',
       weeklySummaryNudge: 'La domenica è un buon giorno per rivedere la settimana.',
+      dayMedicationsProgress: 'Farmaci {taken}/{total}',
+      dayPanicPill: 'AP · {n}',
+      nextDoseTitle: 'Prossima dose',
+      medicationTake: 'Prendi',
+      sleepAwakeningsSummary: '{n} risvegli',
     },
   },
   ja: {
@@ -1934,6 +1979,11 @@ export const LANGUAGES: Record<
       coachMarkNext: '次へ',
       showOnboardingAgain: 'オンボーディングを再表示',
       weeklySummaryNudge: '日曜日は、一週間を振り返り、気づいたことをメモするのに適した日です。',
+      dayMedicationsProgress: '服薬 {taken}/{total}',
+      dayPanicPill: 'パニック · {n}',
+      nextDoseTitle: '次の服用',
+      medicationTake: '飲む',
+      sleepAwakeningsSummary: '覚醒 {n}回',
     },
   },
   ko: {
@@ -2128,6 +2178,11 @@ export const LANGUAGES: Record<
       coachMarkNext: '다음',
       showOnboardingAgain: '온보딩 다시 보기',
       weeklySummaryNudge: '일요일은 한 주를 돌아보고 눈에 띈 점을 메모하기 좋은 날입니다.',
+      dayMedicationsProgress: '약 {taken}/{total}',
+      dayPanicPill: '공황 · {n}',
+      nextDoseTitle: '다음 복용',
+      medicationTake: '복용',
+      sleepAwakeningsSummary: '각성 {n}회',
     },
   },
 };

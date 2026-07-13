@@ -35,9 +35,10 @@ type Props = {
   labels: AppLabels;
   theme: ThemeSlice;
   onChange: (value: string) => void;
+  hideLabel?: boolean;
 };
 
-export function TriggersInput({ label, value, language, labels, theme, onChange }: Props) {
+export function TriggersInput({ label, value, language, labels, theme, onChange, hideLabel }: Props) {
   const log = useMemo(() => parseTriggerLog(value), [value]);
   const [pickerExpanded, setPickerExpanded] = useState(false);
   const [customDraft, setCustomDraft] = useState('');
@@ -74,9 +75,11 @@ export function TriggersInput({ label, value, language, labels, theme, onChange 
 
   return (
     <View style={styles.sectionBlock}>
-      <Text style={[styles.sectionLabel, { backgroundColor: theme.sectionLabelBg }]}>
-        {formatSectionTitle(label)}
-      </Text>
+      {hideLabel ? null : (
+        <Text style={[styles.sectionLabel, { backgroundColor: theme.sectionLabelBg }]}>
+          {formatSectionTitle(label)}
+        </Text>
+      )}
 
       <View style={styles.content}>
         {hasSelected ? (

@@ -35,6 +35,7 @@ type Props = {
   labels: AppLabels;
   theme: ThemeSlice;
   onChange: (value: string) => void;
+  hideLabel?: boolean;
 };
 
 function parseDurationInput(value: string, max: number): number {
@@ -53,7 +54,7 @@ function parseStepsInput(value: string): number | undefined {
   return parsed;
 }
 
-export function SportInput({ label, value, labels, theme, onChange }: Props) {
+export function SportInput({ label, value, labels, theme, onChange, hideLabel }: Props) {
   const log = useMemo(() => parseSportLog(value), [value]);
 
   const updateLog = (nextLog: SportLog) => {
@@ -188,9 +189,11 @@ export function SportInput({ label, value, labels, theme, onChange }: Props) {
 
   return (
     <View style={styles.sectionBlock}>
-      <Text style={[styles.sectionLabel, { backgroundColor: theme.sectionLabelBg }]}>
-        {formatSectionTitle(label)}
-      </Text>
+      {hideLabel ? null : (
+        <Text style={[styles.sectionLabel, { backgroundColor: theme.sectionLabelBg }]}>
+          {formatSectionTitle(label)}
+        </Text>
+      )}
 
       <View style={styles.content}>
         {log.activities.map((activity) => renderActivityCard(activity))}

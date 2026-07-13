@@ -22,6 +22,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { AllMedicationsModal, catalogEntryMedicationLabel } from '@/components/all-medications-modal';
 import { CoachMarksOverlay, type CoachMarkTarget } from '@/components/coach-marks-overlay';
+import { DaySectionCollapsible } from '@/components/day-section-collapsible';
 import { ExpandableInput } from '@/components/expandable-input';
 import { ImportantInfoModal } from '@/components/important-info-modal';
 import { MedicationIntakeLegendModal } from '@/components/medication-intake-legend-modal';
@@ -58,12 +59,18 @@ import { useTheme } from '@/hooks/use-theme';
 import { ensureNotificationPermissions } from '@/services/notifications';
 import { DEFAULT_MEDICATION_ROWS, formatMedicationLabel, parseMedicationLabel, wellnessStore, type MedicationRow } from '@/stores/wellness-store';
 import { formatMonthName } from '@/utils/date-format';
+import {
+  formatMedicationsProgress,
+  summarizeEvents,
+  summarizePanicAttacks,
+  summarizeSleep,
+  summarizeSport,
+  summarizeTriggers,
+} from '@/utils/day-section-summaries';
 import { formatIntakeDaysSummary } from '@/utils/medication-intake';
 import { resolvePanicAttackCount } from '@/utils/panic-attack-log';
-import { hasSleepLogContent, parseSleepLog, serializeSleepLog } from '@/utils/sleep-log';
+import { parseSleepLog, serializeSleepLog } from '@/utils/sleep-log';
 import { mergeNightObservationIntoSleepLog } from '@/utils/sleep-night-observation';
-import { hasSportLogContent, parseSportLog } from '@/utils/sport-log';
-import { hasTriggerLogContent, parseTriggerLog } from '@/utils/trigger-log';
 import { exportWeeklySummaryPdf } from '@/utils/weekly-summary-pdf';
 import {
   addDays,
@@ -123,8 +130,18 @@ function compareMedicationDisplayRows(a: DisplayMedicationRow, b: DisplayMedicat
   return a.originalIndex - b.originalIndex;
 }
 
-function isDayNotesExpandedByDefault(day: Date) {
-  return isSameDay(day, new Date());
+function findNextDose(rows: DisplayMedicationRow[]): DisplayMedicationRow | null {
+  const pending = rows.filter(
+    (item) => item.row.medication.trim() && !item.row.taken && !item.row.skipped && item.displayTime.trim(),
+  );
+  if (pending.length === 0) return null;
+
+  const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
+  const upcoming = pending.find((item) => {
+    const minutes = getMedicationSortMinutes(item.displayTime);
+    return minutes !== null && minutes >= nowMinutes;
+  });
+  return upcoming ?? pending[0];
 }
 
 function HomeScreen() {
@@ -496,39 +513,29 @@ function HomeScreen() {
     medInputRefs.current[dateKey][idx] = el;
   };
 
-  const renderSectionField = (
-    dateKey: string,
-    field: 'sleep' | 'sport' | 'events',
-    label: string,
-    value: string,
-  ) => {
-    const expandKey = `${dateKey}-${field}`;
+  const renderEventsField = (dateKey: string, value: string) => {
+    const expandKey = `${dateKey}-events`;
     return (
       <View
         ref={(node) => {
           fieldAnchorRefs.current[expandKey] = node;
         }}
         collapsable={false}
-        style={[styles.dayNotesSectionCard, { borderColor: ui.rowBorder, backgroundColor: ui.notesBlockBg }]}>
-        <Text style={[styles.sectionLabel, { backgroundColor: ui.sectionLabelBg }]}>
-          {formatSectionTitle(label)}
-        </Text>
-        <View style={styles.sectionInputWrap}>
-          <ExpandableInput
-            value={value}
-            onChangeText={(text) => wellnessStore.updateDayField(dateKey, field, text)}
-            expandKey={expandKey}
-            isExpanded={!!expandedInputs[expandKey]}
-            onToggleExpand={() => toggleExpanded(expandKey)}
-            onFocus={() => handleFocus(expandKey)}
-            onBlur={() => handleBlur(expandKey)}
-            selection={inputSelections[expandKey]}
-            iconMuted={ui.iconMuted}
-            placeholder="..."
-            placeholderTextColor={theme.textSecondary}
-            color={theme.text}
-          />
-        </View>
+        style={styles.sectionInputWrap}>
+        <ExpandableInput
+          value={value}
+          onChangeText={(text) => wellnessStore.updateDayField(dateKey, 'events', text)}
+          expandKey={expandKey}
+          isExpanded={!!expandedInputs[expandKey]}
+          onToggleExpand={() => toggleExpanded(expandKey)}
+          onFocus={() => handleFocus(expandKey)}
+          onBlur={() => handleBlur(expandKey)}
+          selection={inputSelections[expandKey]}
+          iconMuted={ui.iconMuted}
+          placeholder="..."
+          placeholderTextColor={theme.textSecondary}
+          color={theme.text}
+        />
       </View>
     );
   };
@@ -539,6 +546,7 @@ function HomeScreen() {
       count={resolvePanicAttackCount(storedDay)}
       language={language}
       labels={t}
+      hideLabel
       theme={{
         text: theme.text,
         textSecondary: theme.textSecondary,
@@ -555,108 +563,129 @@ function HomeScreen() {
     />
   );
 
-  const renderDayNotesGroup = (dateKey: string, day: Date, storedDay: typeof wellnessStore.days[string] | undefined) => {
-    const notesExpandKey = `${dateKey}-notes`;
-    const isNotesExpanded =
-      notesExpandKey in expandedInputs
-        ? !!expandedInputs[notesExpandKey]
-        : isDayNotesExpandedByDefault(day);
-    const hasNotes =
-      resolvePanicAttackCount(storedDay) > 0 ||
-      hasSleepLogContent(parseSleepLog(storedDay?.sleep ?? '')) ||
-      hasTriggerLogContent(parseTriggerLog(storedDay?.triggers ?? '')) ||
-      hasSportLogContent(parseSportLog(storedDay?.sport ?? '')) ||
-      [storedDay?.events].some((v) => v?.trim());
+  const isSectionOpen = (dateKey: string, section: string) => {
+    const key = `${dateKey}-section-${section}`;
+    return !!expandedInputs[key];
+  };
+
+  const renderDayNotesGroup = (dateKey: string, storedDay: typeof wellnessStore.days[string] | undefined) => {
+    const sleepValue = storedDay?.sleep ?? '';
+    const triggersValue = storedDay?.triggers ?? '';
+    const sportValue = storedDay?.sport ?? '';
+    const eventsValue = storedDay?.events ?? '';
+    const panicCount = resolvePanicAttackCount(storedDay);
+    const sectionTheme = {
+      textSecondary: theme.textSecondary,
+      rowBorder: ui.rowBorder,
+      iconMuted: ui.iconMuted,
+      sectionLabelBg: ui.sectionLabelBg,
+    };
 
     return (
-      <View style={[styles.dayNotesGroup, { borderColor: ui.rowBorder }]}>
-        <Pressable
-          onPress={() => toggleExpanded(notesExpandKey)}
-          style={({ pressed }) => [styles.dayNotesHeader, pressed && styles.pressed]}>
-          <View style={styles.dayNotesTitleRow}>
-            <Text style={[styles.dayNotesTitle, { color: '#4D4D4D' }]}>{formatSectionTitle(t.dayNotes)}</Text>
-            {!isNotesExpanded && hasNotes ? <View style={[styles.dayNotesDot, { backgroundColor: ui.accent }]} /> : null}
-          </View>
-          <Ionicons
-            name={isNotesExpanded ? 'caret-up' : 'caret-down'}
-            size={23}
-            color={ui.iconMuted}
-            style={styles.dayNotesCaret}
+      <View style={styles.dayNotesSections}>
+        <DaySectionCollapsible
+          title={formatSectionTitle(t.sleep)}
+          summary={summarizeSleep(sleepValue, t)}
+          open={isSectionOpen(dateKey, 'sleep')}
+          onToggle={() => toggleExpanded(`${dateKey}-section-sleep`)}
+          theme={sectionTheme}>
+          <SleepInput
+            label={t.sleep}
+            value={sleepValue}
+            labels={t}
+            hideLabel
+            theme={{
+              text: theme.text,
+              textSecondary: theme.textSecondary,
+              activeBg: ui.activeBg,
+              activeText: ui.activeText,
+              inactiveBg: ui.inactiveBg,
+              inactiveBorder: ui.inactiveBorder,
+              inactiveText: ui.inactiveText,
+              modalOverlay: ui.modalOverlay,
+              modalBg: ui.modalBg,
+              subtlePanelBorder: ui.subtlePanelBorder,
+              sectionLabelBg: ui.sectionLabelBg,
+              rowBorder: ui.rowBorder,
+              iconMuted: ui.iconMuted,
+            }}
+            onChange={(text) => wellnessStore.updateDayField(dateKey, 'sleep', text)}
+            onOpenNightObservation={() => setNightObservationDateKey(dateKey)}
           />
-        </Pressable>
-        {isNotesExpanded ? (
-          <View style={styles.dayNotesSections}>
-            <View style={[styles.dayNotesSectionCard, { borderColor: ui.rowBorder, backgroundColor: ui.notesBlockBg }]}>
-              <SleepInput
-                label={t.sleep}
-                value={storedDay?.sleep ?? ''}
-                labels={t}
-                theme={{
-                  text: theme.text,
-                  textSecondary: theme.textSecondary,
-                  activeBg: ui.activeBg,
-                  activeText: ui.activeText,
-                  inactiveBg: ui.inactiveBg,
-                  inactiveBorder: ui.inactiveBorder,
-                  inactiveText: ui.inactiveText,
-                  modalOverlay: ui.modalOverlay,
-                  modalBg: ui.modalBg,
-                  subtlePanelBorder: ui.subtlePanelBorder,
-                  sectionLabelBg: ui.sectionLabelBg,
-                  rowBorder: ui.rowBorder,
-                  iconMuted: ui.iconMuted,
-                }}
-                onChange={(text) => wellnessStore.updateDayField(dateKey, 'sleep', text)}
-                onOpenNightObservation={() => setNightObservationDateKey(dateKey)}
-              />
-            </View>
-            <View style={[styles.dayNotesSectionCard, { borderColor: ui.rowBorder, backgroundColor: ui.notesBlockBg }]}>
-              <TriggersInput
-                label={t.triggers}
-                value={storedDay?.triggers ?? ''}
-                language={language}
-                labels={t}
-                theme={{
-                  text: theme.text,
-                  textSecondary: theme.textSecondary,
-                  activeBg: ui.activeBg,
-                  activeText: ui.activeText,
-                  inactiveBg: ui.inactiveBg,
-                  inactiveBorder: ui.inactiveBorder,
-                  inactiveText: ui.inactiveText,
-                  sectionLabelBg: ui.sectionLabelBg,
-                  rowBorder: ui.rowBorder,
-                  iconMuted: ui.iconMuted,
-                }}
-                onChange={(text) => wellnessStore.updateDayField(dateKey, 'triggers', text)}
-              />
-            </View>
-            <View style={[styles.dayNotesSectionCard, { borderColor: ui.rowBorder, backgroundColor: ui.notesBlockBg }]}>
-              <SportInput
-                label={t.sport}
-                value={storedDay?.sport ?? ''}
-                labels={t}
-                theme={{
-                  text: theme.text,
-                  textSecondary: theme.textSecondary,
-                  activeBg: ui.activeBg,
-                  activeText: ui.activeText,
-                  inactiveBg: ui.inactiveBg,
-                  inactiveBorder: ui.inactiveBorder,
-                  inactiveText: ui.inactiveText,
-                  sectionLabelBg: ui.sectionLabelBg,
-                  rowBorder: ui.rowBorder,
-                  iconMuted: ui.iconMuted,
-                }}
-                onChange={(text) => wellnessStore.updateDayField(dateKey, 'sport', text)}
-              />
-            </View>
-            {renderSectionField(dateKey, 'events', t.events, storedDay?.events ?? '')}
-            <View style={[styles.dayNotesSectionCard, { borderColor: ui.rowBorder, backgroundColor: ui.notesBlockBg }]}>
-              {renderPanicAttackField(dateKey, storedDay)}
-            </View>
-          </View>
-        ) : null}
+        </DaySectionCollapsible>
+
+        <DaySectionCollapsible
+          title={formatSectionTitle(t.triggers)}
+          summary={summarizeTriggers(triggersValue, language)}
+          open={isSectionOpen(dateKey, 'triggers')}
+          onToggle={() => toggleExpanded(`${dateKey}-section-triggers`)}
+          theme={sectionTheme}>
+          <TriggersInput
+            label={t.triggers}
+            value={triggersValue}
+            language={language}
+            labels={t}
+            hideLabel
+            theme={{
+              text: theme.text,
+              textSecondary: theme.textSecondary,
+              activeBg: ui.activeBg,
+              activeText: ui.activeText,
+              inactiveBg: ui.inactiveBg,
+              inactiveBorder: ui.inactiveBorder,
+              inactiveText: ui.inactiveText,
+              sectionLabelBg: ui.sectionLabelBg,
+              rowBorder: ui.rowBorder,
+              iconMuted: ui.iconMuted,
+            }}
+            onChange={(text) => wellnessStore.updateDayField(dateKey, 'triggers', text)}
+          />
+        </DaySectionCollapsible>
+
+        <DaySectionCollapsible
+          title={formatSectionTitle(t.sport)}
+          summary={summarizeSport(sportValue, t)}
+          open={isSectionOpen(dateKey, 'sport')}
+          onToggle={() => toggleExpanded(`${dateKey}-section-sport`)}
+          theme={sectionTheme}>
+          <SportInput
+            label={t.sport}
+            value={sportValue}
+            labels={t}
+            hideLabel
+            theme={{
+              text: theme.text,
+              textSecondary: theme.textSecondary,
+              activeBg: ui.activeBg,
+              activeText: ui.activeText,
+              inactiveBg: ui.inactiveBg,
+              inactiveBorder: ui.inactiveBorder,
+              inactiveText: ui.inactiveText,
+              sectionLabelBg: ui.sectionLabelBg,
+              rowBorder: ui.rowBorder,
+              iconMuted: ui.iconMuted,
+            }}
+            onChange={(text) => wellnessStore.updateDayField(dateKey, 'sport', text)}
+          />
+        </DaySectionCollapsible>
+
+        <DaySectionCollapsible
+          title={formatSectionTitle(t.events)}
+          summary={summarizeEvents(eventsValue)}
+          open={isSectionOpen(dateKey, 'events')}
+          onToggle={() => toggleExpanded(`${dateKey}-section-events`)}
+          theme={sectionTheme}>
+          {renderEventsField(dateKey, eventsValue)}
+        </DaySectionCollapsible>
+
+        <DaySectionCollapsible
+          title={formatSectionTitle(t.panicAttackDay)}
+          summary={panicCount > 0 ? String(panicCount) : ''}
+          open={isSectionOpen(dateKey, 'panic')}
+          onToggle={() => toggleExpanded(`${dateKey}-section-panic`)}
+          theme={sectionTheme}>
+          {renderPanicAttackField(dateKey, storedDay)}
+        </DaySectionCollapsible>
       </View>
     );
   };
@@ -762,6 +791,10 @@ function HomeScreen() {
 
                 const weekdayIndex = getDay(day) as WeekdayIndex;
                 const dayWeekBg = getDayWeekBackground(isDark, weekdayIndex);
+                const filledMeds = medRows.filter((item) => item.row.medication.trim());
+                const takenMedsCount = filledMeds.filter((item) => item.row.taken).length;
+                const panicCount = resolvePanicAttackCount(storedDay);
+                const nextDose = isToday ? findNextDose(medRows) : null;
 
                 const reviewBg =
                   isReviewMode && isPastDay && !isSunday
@@ -804,8 +837,49 @@ function HomeScreen() {
                           />
                         ) : null}
                       </View>
+                      {filledMeds.length > 0 || panicCount > 0 ? (
+                        <View style={styles.dayHeaderPills}>
+                          {filledMeds.length > 0 ? (
+                            <View style={[styles.dayHeaderPill, { backgroundColor: ui.inactiveBg, borderColor: ui.rowBorder }]}>
+                              <Text style={[styles.dayHeaderPillText, { color: theme.textSecondary }]}>
+                                {formatMedicationsProgress(takenMedsCount, filledMeds.length, t)}
+                              </Text>
+                            </View>
+                          ) : null}
+                          {panicCount > 0 ? (
+                            <View style={[styles.dayHeaderPill, { backgroundColor: theme.panicRow, borderColor: ui.rowBorder }]}>
+                              <Text style={[styles.dayHeaderPillText, { color: theme.textSecondary }]}>
+                                {summarizePanicAttacks(panicCount, t)}
+                              </Text>
+                            </View>
+                          ) : null}
+                        </View>
+                      ) : null}
                     </View>
                     <View style={[styles.dayDivider, { backgroundColor: ui.dayBorder }]} />
+
+                    {nextDose ? (
+                      <Pressable
+                        onPress={() =>
+                          setStatusTarget({
+                            dateKey,
+                            rowId: nextDose.row.id,
+                            idx: nextDose.originalIndex,
+                          })
+                        }
+                        style={({ pressed }) => [
+                          styles.nextDoseBanner,
+                          { backgroundColor: ui.notesBlockBg, borderColor: ui.dayBorder },
+                          pressed && styles.pressed,
+                        ]}>
+                        <Text style={[styles.nextDoseLabel, { color: theme.textSecondary }]}>{t.nextDoseTitle}</Text>
+                        <Text style={[styles.nextDoseValue, { color: theme.text }]} numberOfLines={1}>
+                          {formatTimeValue(parseTimeValue(nextDose.displayTime))}
+                          {' · '}
+                          {parseMedicationLabel(nextDose.row.medication).name || nextDose.row.medication}
+                        </Text>
+                      </Pressable>
+                    ) : null}
 
                     <View style={[styles.dayNotesBody, { backgroundColor: ui.notesBlockBg, borderColor: ui.dayBorder }]}>
                     <View style={[styles.medicationsBlockHeader, { borderColor: ui.rowBorder, backgroundColor: ui.sectionLabelBg }]}>
@@ -833,7 +907,9 @@ function HomeScreen() {
                           <Ionicons name="help-circle-outline" size={13} color={ui.iconMuted} />
                         </Pressable>
                         <Text style={styles.medicationsHeaderStatusText}>
-                          {t.status.toLocaleLowerCase()}
+                          {filledMeds.length > 0
+                            ? `${takenMedsCount}/${filledMeds.length}`
+                            : t.status.toLocaleLowerCase()}
                         </Text>
                       </View>
                     </View>
@@ -972,18 +1048,54 @@ function HomeScreen() {
                             </View>
                             <View style={styles.colCheckCell}>
                               <Pressable
-                                onPress={() => setStatusTarget({ dateKey, rowId: row.id, idx: originalIndex })}
-                                style={({ pressed }) => [
-                                  styles.checkButton,
-                                  pressed && styles.pressed,
+                                onPress={() => {
+                                  if (!row.medication.trim()) return;
+                                  if (!row.taken && !row.skipped) {
+                                    wellnessStore.setMedicationStatus(dateKey, row.id, originalIndex, 'taken');
+                                    return;
+                                  }
+                                  setStatusTarget({ dateKey, rowId: row.id, idx: originalIndex });
+                                }}
+                                onLongPress={() => setStatusTarget({ dateKey, rowId: row.id, idx: originalIndex })}
+                                disabled={!row.medication.trim()}
+                                accessibilityLabel={
                                   row.taken
-                                    ? [styles.checkOn, { backgroundColor: ui.activeBg, borderColor: ui.activeBg }]
+                                    ? t.medicationTaken
                                     : row.skipped
-                                      ? [styles.checkSkipped, { backgroundColor: ui.checkOffBg, borderColor: '#ef4444' }]
-                                      : [styles.checkOff, { backgroundColor: ui.checkOffBg, borderColor: ui.checkOffBorder }],
+                                      ? t.medicationSkipped
+                                      : t.medicationTake
+                                }
+                                style={({ pressed }) => [
+                                  styles.takeButton,
+                                  row.taken
+                                    ? { backgroundColor: ui.activeBg, borderColor: ui.activeBg }
+                                    : row.skipped
+                                      ? { backgroundColor: ui.checkOffBg, borderColor: '#ef4444' }
+                                      : {
+                                          backgroundColor: row.medication.trim() ? ui.activeBg : ui.checkOffBg,
+                                          borderColor: row.medication.trim() ? ui.activeBg : ui.checkOffBorder,
+                                          opacity: row.medication.trim() ? 1 : 0.35,
+                                        },
+                                  pressed && styles.pressed,
                                 ]}>
-                                {row.taken ? <Ionicons name="checkmark" size={14} color={ui.activeText} /> : null}
-                                {row.skipped ? <Ionicons name="close" size={14} color="#ef4444" /> : null}
+                                <Text
+                                  style={[
+                                    styles.takeButtonText,
+                                    {
+                                      color: row.taken || (!row.skipped && row.medication.trim())
+                                        ? ui.activeText
+                                        : row.skipped
+                                          ? '#ef4444'
+                                          : theme.textSecondary,
+                                    },
+                                  ]}
+                                  numberOfLines={1}>
+                                  {row.taken
+                                    ? t.medicationTaken
+                                    : row.skipped
+                                      ? t.medicationSkipped
+                                      : t.medicationTake}
+                                </Text>
                               </Pressable>
                             </View>
                           </View>
@@ -1024,7 +1136,7 @@ function HomeScreen() {
                     })}
                     </View>
 
-                    {renderDayNotesGroup(dateKey, day, storedDay)}
+                    {renderDayNotesGroup(dateKey, storedDay)}
                   </View>
                 );
               })}
@@ -1703,12 +1815,48 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 8,
     paddingHorizontal: 16,
     paddingVertical: 8,
   },
-  dayHeaderTextWrap: { flex: 1, flexDirection: 'row', alignItems: 'center' },
+  dayHeaderTextWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 },
   dayHeaderText: { ...dayHeaderTitleStyle, lineHeight: 26 },
   dayHeaderSubText: { ...weekDateStyle, marginLeft: 6, lineHeight: 26 },
+  dayHeaderPills: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexShrink: 1,
+  },
+  dayHeaderPill: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  dayHeaderPillText: {
+    fontSize: 11,
+    fontFamily: Fonts.sansMedium,
+    lineHeight: 14,
+  },
+  nextDoseBanner: {
+    marginHorizontal: 12,
+    marginTop: 10,
+    marginBottom: 0,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 2,
+  },
+  nextDoseLabel: {
+    ...weekServiceTextStyle,
+    letterSpacing: 1.2,
+    fontSize: 10,
+  },
+  nextDoseValue: {
+    ...weekCardTitleStyle,
+  },
   todayWalkingGif: {
     width: 26,
     height: 22,
@@ -1830,12 +1978,12 @@ const styles = StyleSheet.create({
     paddingRight: 10,
   },
   colCheckCell: {
-    width: 44,
+    width: 78,
     flexShrink: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
-    paddingRight: 4,
+    paddingVertical: 8,
+    paddingRight: 6,
   },
   takenMetaWrap: {
     flexDirection: 'row',
@@ -1864,15 +2012,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  checkButton: { width: 22, height: 22, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  checkOn: { borderWidth: 1 },
-  checkOff: { borderWidth: 1 },
-  checkSkipped: { borderWidth: 1 },
-  dayNotesGroup: { borderTopWidth: 1 },
+  takeButton: {
+    minWidth: 70,
+    maxWidth: 78,
+    minHeight: 28,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+  },
+  takeButtonText: {
+    fontSize: 11,
+    fontFamily: Fonts.sansSemiBold,
+    lineHeight: 14,
+    textAlign: 'center',
+  },
   dayNotesSections: {
     marginHorizontal: 12,
+    marginTop: 4,
     marginBottom: 10,
-    gap: 12,
+    gap: 8,
   },
   dayNotesSectionCard: {
     borderWidth: 1,
@@ -1886,40 +2047,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 8,
     overflow: 'hidden',
-  },
-  dayNotesHeader: {
-    minHeight: 58,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 24,
-  },
-  dayNotesTitleRow: {
-    position: 'absolute',
-    top: 10,
-    left: 48,
-    right: 48,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  dayNotesTitle: {
-    ...weekCardTitleStyle,
-    fontSize: 18,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  dayNotesCaret: {
-    position: 'absolute',
-    bottom: 3,
-    alignSelf: 'center',
-  },
-  dayNotesDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
   },
   sectionLabel: {
     ...daySectionLabelStyle,

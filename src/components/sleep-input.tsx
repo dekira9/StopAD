@@ -42,6 +42,7 @@ type Props = {
   theme: ThemeSlice;
   onChange: (value: string) => void;
   onOpenNightObservation?: () => void;
+  hideLabel?: boolean;
 };
 
 function formatDisplayTime(time: string): string {
@@ -49,7 +50,7 @@ function formatDisplayTime(time: string): string {
   return formatTimeValue(parseTimeValue(time));
 }
 
-export function SleepInput({ label, value, labels, theme, onChange, onOpenNightObservation }: Props) {
+export function SleepInput({ label, value, labels, theme, onChange, onOpenNightObservation, hideLabel }: Props) {
   const log = useMemo(() => parseSleepLog(value), [value]);
   const [pickerTarget, setPickerTarget] = useState<PickerTarget | null>(null);
 
@@ -137,9 +138,11 @@ export function SleepInput({ label, value, labels, theme, onChange, onOpenNightO
   return (
     <>
       <View style={styles.sectionBlock}>
-        <Text style={[styles.sectionLabel, { backgroundColor: theme.sectionLabelBg }]}>
-          {formatSectionTitle(label)}
-        </Text>
+        {hideLabel ? null : (
+          <Text style={[styles.sectionLabel, { backgroundColor: theme.sectionLabelBg }]}>
+            {formatSectionTitle(label)}
+          </Text>
+        )}
 
         <View style={styles.content}>
           {renderIntervalRow(
