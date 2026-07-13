@@ -8,6 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { LANGUAGES, type AppLabels, type Language } from '@/constants/i18n';
 
@@ -50,6 +51,7 @@ export function OnboardingModal({
   onLearnMore,
   onComplete,
 }: Props) {
+  const insets = useSafeAreaInsets();
   const [step, setStep] = useState(0);
 
   const finish = () => {
@@ -90,7 +92,15 @@ export function OnboardingModal({
 
   return (
     <Modal visible={visible} animationType="fade" onRequestClose={finish}>
-      <View style={[styles.screen, { backgroundColor: theme.modalBg }]}>
+      <View
+        style={[
+          styles.screen,
+          {
+            backgroundColor: theme.modalBg,
+            paddingTop: Math.max(insets.top, 12),
+            paddingBottom: Math.max(insets.bottom, 12),
+          },
+        ]}>
         <View style={styles.topBar}>
           <View style={styles.topBarSide}>
             {step > 0 ? (
@@ -194,7 +204,7 @@ export function OnboardingModal({
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, paddingTop: 12 },
+  screen: { flex: 1 },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -228,7 +238,7 @@ const styles = StyleSheet.create({
   langRowInactive: {},
   langRowText: { fontSize: 13, fontWeight: '700' },
   langCheckSpacer: { width: 16, height: 16 },
-  footer: { paddingHorizontal: 24, paddingBottom: 28, paddingTop: 8, gap: 10 },
+  footer: { paddingHorizontal: 24, paddingBottom: 16, paddingTop: 8, gap: 10 },
   primaryButton: {
     alignItems: 'center',
     justifyContent: 'center',
