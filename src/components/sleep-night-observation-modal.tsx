@@ -3,7 +3,7 @@ import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { NavigationBar } from 'expo-navigation-bar';
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Dimensions,
   Platform,
@@ -17,13 +17,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { AppLabels } from '@/constants/i18n';
 import { useAppSystemChromeRestore } from '@/hooks/use-system-chrome';
-import { startShushSound, stopShushSound } from '@/utils/shush-sound';
+import { prepareShushSound, startShushSound, stopShushSound } from '@/utils/shush-sound';
 import type { SleepLog } from '@/utils/sleep-log';
 import {
   buildSleepLogFromNightEvents,
   type NightObservationEvent,
 } from '@/utils/sleep-night-observation';
-import { playSoftTapSound } from '@/utils/soft-tap-sound';
+import { playSoftTapSound, prepareSoftTapSound } from '@/utils/soft-tap-sound';
 
 const AWAKE_BG = '#1f1f1f';
 const AWAKE_TEXT = '#4a4a4a';
@@ -53,6 +53,8 @@ function applyNightObservationChrome() {
 export function SleepNightObservationOverlay({ labels, onClose, onFinish }: Props) {
   const insets = useSafeAreaInsets();
   const restoreAppChrome = useAppSystemChromeRestore();
+  const restoreAppChromeRef = useRef(restoreAppChrome);
+  restoreAppChromeRef.current = restoreAppChrome;
   const [events, setEvents] = useState<NightObservationEvent[]>([]);
   const screen = Dimensions.get('screen');
 
@@ -64,13 +66,17 @@ export function SleepNightObservationOverlay({ labels, onClose, onFinish }: Prop
     activateChrome();
     const retry = setTimeout(activateChrome, 50);
     void activateKeepAwakeAsync('sleep-night-observation');
+    void Promise.all([prepareSoftTapSound(), prepareShushSound()]).catch((error) => {
+      console.warn('[night-observation] audio prepare failed', error);
+    });
+
     return () => {
       clearTimeout(retry);
       deactivateKeepAwake('sleep-night-observation');
       void stopShushSound();
-      restoreAppChrome();
+      restoreAppChromeRef.current();
     };
-  }, [activateChrome, restoreAppChrome]);
+  }, [activateChrome]);
 
   const handleAwakePress = () => {
     void playSoftTapSound();
@@ -103,7 +109,7 @@ export function SleepNightObservationOverlay({ labels, onClose, onFinish }: Prop
           top: -insets.top,
         },
       ]}>
-      <ExpoStatusBar style="light" translucent />
+      <ExpoStatusBar style="light" />
       {Platform.OS === 'android' ? (
         <RNStatusBar translucent backgroundColor="transparent" barStyle="light-content" />
       ) : null}

@@ -1,4 +1,9 @@
-import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
+import {
+  createAudioPlayer,
+  setAudioModeAsync,
+  setIsAudioActiveAsync,
+  type AudioPlayer,
+} from 'expo-audio';
 import { cacheDirectory, writeAsStringAsync } from 'expo-file-system/legacy';
 import { Platform } from 'react-native';
 
@@ -47,7 +52,7 @@ function nextPinkNoiseSample(state: PinkNoiseState): number {
 
 function lowPassSample(input: number, state: LowPassState, cutoffHz: number): number {
   const rc = 1 / (2 * Math.PI * cutoffHz);
-  const alpha = (1 / SAMPLE_RATE) / (rc + 1 / SAMPLE_RATE);
+  const alpha = 1 / SAMPLE_RATE / (rc + 1 / SAMPLE_RATE);
   state.y += alpha * (input - state.y);
   return state.y;
 }
@@ -141,38 +146,59 @@ function bytesToBase64(bytes: Uint8Array): string {
 }
 
 let cachedUri: string | null = null;
+let uriReady: Promise<string> | null = null;
 let nativePlayer: AudioPlayer | null = null;
 let webContext: AudioContext | null = null;
 let webSource: AudioBufferSourceNode | null = null;
-let audioModeConfigured = false;
+let audioReady: Promise<void> | null = null;
+let playGeneration = 0;
 
-async function ensureAudioMode(): Promise<void> {
-  if (audioModeConfigured) return;
+async function ensureAudioReady(): Promise<void> {
+  if (!audioReady) {
+    audioReady = (async () => {
+      await setIsAudioActiveAsync(true);
+      await setAudioModeAsync({
+        playsInSilentMode: true,
+        interruptionMode: 'mixWithOthers',
+        shouldPlayInBackground: false,
+        allowsRecording: false,
+        shouldRouteThroughEarpiece: false,
+      });
+    })().catch((error) => {
+      audioReady = null;
+      throw error;
+    });
+  }
 
-  await setAudioModeAsync({
-    playsInSilentMode: true,
-    interruptionMode: 'mixWithOthers',
-    shouldPlayInBackground: false,
-  });
-  audioModeConfigured = true;
+  await audioReady;
+  await setIsAudioActiveAsync(true);
 }
 
 async function getShushUri(): Promise<string> {
   if (cachedUri) return cachedUri;
 
-  const samples = synthesizeShushSamples(SAMPLE_RATE * MAX_DURATION_SEC);
-  const wavBytes = encodeWav(samples);
+  if (!uriReady) {
+    uriReady = (async () => {
+      const samples = synthesizeShushSamples(SAMPLE_RATE * MAX_DURATION_SEC);
+      const wavBytes = encodeWav(samples);
 
-  if (Platform.OS === 'web') {
-    const blob = new Blob([new Uint8Array(wavBytes)], { type: 'audio/wav' });
-    cachedUri = URL.createObjectURL(blob);
-    return cachedUri;
+      if (Platform.OS === 'web') {
+        const blob = new Blob([new Uint8Array(wavBytes)], { type: 'audio/wav' });
+        cachedUri = URL.createObjectURL(blob);
+        return cachedUri;
+      }
+
+      const fileUri = `${cacheDirectory}${CACHE_FILE_NAME}`;
+      await writeAsStringAsync(fileUri, bytesToBase64(wavBytes), { encoding: 'base64' });
+      cachedUri = fileUri;
+      return fileUri;
+    })().catch((error) => {
+      uriReady = null;
+      throw error;
+    });
   }
 
-  const fileUri = `${cacheDirectory}${CACHE_FILE_NAME}`;
-  await writeAsStringAsync(fileUri, bytesToBase64(wavBytes), { encoding: 'base64' });
-  cachedUri = fileUri;
-  return fileUri;
+  return uriReady;
 }
 
 function stopWebPlayback(): void {
@@ -194,45 +220,96 @@ function stopWebPlayback(): void {
 
 function stopNativePlayback(): void {
   if (!nativePlayer) return;
-  nativePlayer.pause();
-  nativePlayer.remove();
+  try {
+    nativePlayer.pause();
+    nativePlayer.remove();
+  } catch {
+    // Player may already be released.
+  }
   nativePlayer = null;
 }
 
+export async function prepareShushSound(): Promise<void> {
+  await ensureAudioReady();
+  await getShushUri();
+}
+
 export async function stopShushSound(): Promise<void> {
+  playGeneration += 1;
   stopWebPlayback();
   stopNativePlayback();
 }
 
 export async function startShushSound(): Promise<void> {
-  await stopShushSound();
-  await ensureAudioMode();
+  stopWebPlayback();
+  stopNativePlayback();
+  const generation = ++playGeneration;
 
-  if (Platform.OS === 'web') {
-    const uri = await getShushUri();
-    const context = new AudioContext();
-    webContext = context;
+  try {
+    await ensureAudioReady();
+    if (generation !== playGeneration) return;
 
-    const response = await fetch(uri);
-    const arrayBuffer = await response.arrayBuffer();
-    const audioBuffer = await context.decodeAudioData(arrayBuffer);
-    const source = context.createBufferSource();
-    source.buffer = audioBuffer;
-    source.connect(context.destination);
-    source.onended = () => {
-      if (webSource === source) {
-        webSource = null;
+    if (Platform.OS === 'web') {
+      const uri = await getShushUri();
+      if (generation !== playGeneration) return;
+
+      const context = new AudioContext();
+      webContext = context;
+
+      const response = await fetch(uri);
+      const arrayBuffer = await response.arrayBuffer();
+      const audioBuffer = await context.decodeAudioData(arrayBuffer);
+      if (generation !== playGeneration) {
+        void context.close();
+        if (webContext === context) webContext = null;
+        return;
       }
-    };
-    source.start(0);
-    webSource = source;
-    return;
-  }
 
-  const uri = await getShushUri();
-  const player = createAudioPlayer({ uri });
-  nativePlayer = player;
-  player.volume = 1;
-  await player.seekTo(0);
-  player.play();
+      const source = context.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(context.destination);
+      source.onended = () => {
+        if (webSource === source) {
+          webSource = null;
+        }
+      };
+      source.start(0);
+      webSource = source;
+      return;
+    }
+
+    const uri = await getShushUri();
+    if (generation !== playGeneration) return;
+
+    const player = createAudioPlayer(
+      { uri },
+      {
+        keepAudioSessionActive: true,
+        downloadFirst: true,
+      },
+    );
+    if (generation !== playGeneration) {
+      try {
+        player.remove();
+      } catch {
+        // ignore
+      }
+      return;
+    }
+
+    nativePlayer = player;
+    player.volume = 1;
+    await player.seekTo(0);
+    if (generation !== playGeneration) {
+      stopNativePlayback();
+      return;
+    }
+    player.play();
+  } catch (error) {
+    console.warn('[shush-sound] start failed', error);
+    if (generation === playGeneration) {
+      stopNativePlayback();
+      stopWebPlayback();
+    }
+  }
 }

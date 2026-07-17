@@ -3,27 +3,17 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 
 import { getImportantInfoText, isImportantInfoSectionTitle } from '@/constants/important-info';
 import type { AppLabels, Language } from '@/constants/i18n';
-
-type ThemeSlice = {
-  text: string;
-  textSecondary: string;
-  activeBg: string;
-  activeText: string;
-  modalOverlay: string;
-  modalBg: string;
-  subtlePanelBorder: string;
-  sectionLabelBg: string;
-};
+import { useAppChromeTheme } from '@/hooks/use-app-chrome-theme';
 
 type Props = {
   visible: boolean;
   language: Language;
   labels: AppLabels;
-  theme: ThemeSlice;
   onClose: () => void;
 };
 
-export function ImportantInfoModal({ visible, language, labels, theme, onClose }: Props) {
+export function ImportantInfoModal({ visible, language, labels, onClose }: Props) {
+  const { modal: theme } = useAppChromeTheme();
   const paragraphs = getImportantInfoText(language).split('\n\n').filter(Boolean);
 
   return (

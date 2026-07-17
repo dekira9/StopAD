@@ -2,28 +2,18 @@ import { Ionicons } from '@expo/vector-icons';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import type { AppLabels } from '@/constants/i18n';
-
-type ThemeSlice = {
-  text: string;
-  textSecondary: string;
-  activeBg: string;
-  activeText: string;
-  modalOverlay: string;
-  modalBg: string;
-  subtlePanelBorder: string;
-  sectionLabelBg: string;
-};
+import { useAppChromeTheme } from '@/hooks/use-app-chrome-theme';
 
 type Props = {
   visible: boolean;
   labels: AppLabels;
-  theme: ThemeSlice;
   onClose: () => void;
 };
 
 const STEPS = ['panicAttackStep1', 'panicAttackStep2', 'panicAttackStep3', 'panicAttackStep4', 'panicAttackStep5'] as const;
 
-export function PanicAttackModal({ visible, labels, theme, onClose }: Props) {
+export function PanicAttackModal({ visible, labels, onClose }: Props) {
+  const { modal: theme } = useAppChromeTheme();
   return (
     <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
       <View style={[styles.overlay, { backgroundColor: theme.modalOverlay }]}>

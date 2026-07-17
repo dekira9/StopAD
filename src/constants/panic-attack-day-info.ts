@@ -8,6 +8,10 @@ export type PanicAttackDayInfoLine = {
 const PANIC_ATTACK_DAY_INFO_RU: PanicAttackDayInfoLine[] = [
   {
     type: 'body',
+    text: 'Внезапный приступ сильной тревоги и непреодолимого страха, который достигает пика за несколько минут и сопровождается резкими физическими симптомами.',
+  },
+  {
+    type: 'body',
     text: 'Иногда приступ не воспринимается как страх — на первом месте оказываются тело и его реакции: резкие физические ощущения, которые возникают внезапно и без видимого повода.',
   },
   { type: 'lead', text: 'Возможные признаки:' },
@@ -28,6 +32,10 @@ const PANIC_ATTACK_DAY_INFO_RU: PanicAttackDayInfoLine[] = [
 ];
 
 const PANIC_ATTACK_DAY_INFO_EN: PanicAttackDayInfoLine[] = [
+  {
+    type: 'body',
+    text: 'A sudden attack of intense anxiety and overwhelming fear that peaks within a few minutes and is accompanied by sharp physical symptoms.',
+  },
   {
     type: 'body',
     text: 'Sometimes an episode is not experienced as fear — the body reacts first: sharp physical sensations that come on suddenly, without any clear trigger.',
@@ -52,6 +60,10 @@ const PANIC_ATTACK_DAY_INFO_EN: PanicAttackDayInfoLine[] = [
 const PANIC_ATTACK_DAY_INFO_ES: PanicAttackDayInfoLine[] = [
   {
     type: 'body',
+    text: 'Un ataque súbito de ansiedad intensa y miedo abrumador que alcanza su pico en pocos minutos y va acompañado de síntomas físicos intensos.',
+  },
+  {
+    type: 'body',
     text: 'A veces el episodio no se vive como miedo — primero reacciona el cuerpo: sensaciones físicas intensas que aparecen de repente, sin un motivo evidente.',
   },
   { type: 'lead', text: 'Posibles signos:' },
@@ -72,6 +84,10 @@ const PANIC_ATTACK_DAY_INFO_ES: PanicAttackDayInfoLine[] = [
 ];
 
 const PANIC_ATTACK_DAY_INFO_FR: PanicAttackDayInfoLine[] = [
+  {
+    type: 'body',
+    text: 'Une attaque soudaine d\'anxiété intense et de peur écrasante qui atteint son pic en quelques minutes et s\'accompagne de symptômes physiques aigus.',
+  },
   {
     type: 'body',
     text: 'Parfois l\'épisode n\'est pas ressenti comme de la peur — le corps réagit d\'abord : des sensations physiques vives qui surviennent soudainement, sans raison apparente.',
@@ -96,6 +112,10 @@ const PANIC_ATTACK_DAY_INFO_FR: PanicAttackDayInfoLine[] = [
 const PANIC_ATTACK_DAY_INFO_DE: PanicAttackDayInfoLine[] = [
   {
     type: 'body',
+    text: 'Ein plötzlicher Anfall starker Angst und überwältigender Furcht, der innerhalb weniger Minuten seinen Höhepunkt erreicht und von heftigen körperlichen Symptomen begleitet wird.',
+  },
+  {
+    type: 'body',
     text: 'Manchmal wird ein Anfall nicht als Angst erlebt — zuerst reagiert der Körper: heftige körperliche Empfindungen, die plötzlich und ohne erkennbaren Anlass auftreten.',
   },
   { type: 'lead', text: 'Mögliche Anzeichen:' },
@@ -116,6 +136,10 @@ const PANIC_ATTACK_DAY_INFO_DE: PanicAttackDayInfoLine[] = [
 ];
 
 const PANIC_ATTACK_DAY_INFO_ZH: PanicAttackDayInfoLine[] = [
+  {
+    type: 'body',
+    text: '突然出现的强烈焦虑与无法抗拒的恐惧发作，在数分钟内达到高峰，并伴有剧烈的身体症状。',
+  },
   {
     type: 'body',
     text: '有时发作并不被感受为恐惧——首先是身体反应：突然出现的强烈身体感觉，没有明显诱因。',
@@ -140,6 +164,10 @@ const PANIC_ATTACK_DAY_INFO_ZH: PanicAttackDayInfoLine[] = [
 const PANIC_ATTACK_DAY_INFO_PT: PanicAttackDayInfoLine[] = [
   {
     type: 'body',
+    text: 'Um ataque súbito de ansiedade intensa e medo avassalador que atinge o pico em poucos minutos e é acompanhado de sintomas físicos intensos.',
+  },
+  {
+    type: 'body',
     text: 'Às vezes o episódio não é vivido como medo — primeiro reage o corpo: sensações físicas intensas que surgem de repente, sem motivo aparente.',
   },
   { type: 'lead', text: 'Possíveis sinais:' },
@@ -160,6 +188,10 @@ const PANIC_ATTACK_DAY_INFO_PT: PanicAttackDayInfoLine[] = [
 ];
 
 const PANIC_ATTACK_DAY_INFO_IT: PanicAttackDayInfoLine[] = [
+  {
+    type: 'body',
+    text: 'Un attacco improvviso di ansia intensa e paura schiacciante che raggiunge il picco in pochi minuti e si accompagna a sintomi fisici acuti.',
+  },
   {
     type: 'body',
     text: 'A volte l\'episodio non è vissuto come paura — reagisce prima il corpo: sensazioni fisiche intense che compaiono all\'improvviso, senza un motivo evidente.',
@@ -184,6 +216,10 @@ const PANIC_ATTACK_DAY_INFO_IT: PanicAttackDayInfoLine[] = [
 const PANIC_ATTACK_DAY_INFO_JA: PanicAttackDayInfoLine[] = [
   {
     type: 'body',
+    text: '強い不安と抗いがたい恐怖の突然の発作で、数分のうちにピークに達し、急激な身体症状を伴います。',
+  },
+  {
+    type: 'body',
     text: '発作が恐怖として感じられないこともあります——まず反応するのは身体です。明確なきっかけなく、突然現れる鋭い身体的感覚。',
   },
   { type: 'lead', text: '考えられる兆候：' },
@@ -204,6 +240,10 @@ const PANIC_ATTACK_DAY_INFO_JA: PanicAttackDayInfoLine[] = [
 ];
 
 const PANIC_ATTACK_DAY_INFO_KO: PanicAttackDayInfoLine[] = [
+  {
+    type: 'body',
+    text: '강한 불안과 억누를 수 없는 공포의 갑작스러운 발작으로, 몇 분 안에 정점에 이르며 급격한 신체 증상을 동반합니다.',
+  },
   {
     type: 'body',
     text: '때로는 발작이 두려움으로 느껴지지 않습니다 — 먼저 반응하는 것은 몸입니다. 분명한 계기 없이 갑자기 나타나는 날카로운 신체 감각.',

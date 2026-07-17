@@ -9,28 +9,14 @@ import { MedicationIntakeDaysModal } from '@/components/medication-intake-days-m
 import { formatTimeValue, MedicationTimePickerModal, parseTimeValue } from '@/components/medication-time-picker-modal';
 import type { AppLabels } from '@/constants/i18n';
 import { weekBodyTextStyle, weekButtonTextStyle, weekCardTitleStyle, weekDayTitleStyle, weekFieldLabelStyle, weekServiceTextStyle } from '@/constants/typography';
+import { useAppChromeTheme } from '@/hooks/use-app-chrome-theme';
 import type { MedicationRepeatConfig } from '@/stores/wellness-store';
 import { formatDayMonth } from '@/utils/date-format';
 import { formatIntakeDaysSummary } from '@/utils/medication-intake';
 
-type ThemeSlice = {
-  text: string;
-  textSecondary: string;
-  activeBg: string;
-  activeText: string;
-  inactiveBg: string;
-  inactiveBorder: string;
-  inactiveText: string;
-  buttonShadow: number;
-  modalOverlay: string;
-  modalBg: string;
-  subtlePanelBorder: string;
-};
-
 type Props = {
   visible: boolean;
   labels: AppLabels;
-  theme: ThemeSlice;
   medication: string;
   times: string[];
   intakeDaysSummary: string;
@@ -58,7 +44,6 @@ function getInitialLocalTimes(times: string[]): string[] {
 export function MedicationScheduleModal({
   visible,
   labels,
-  theme,
   medication,
   times,
   intakeDaysSummary,
@@ -72,6 +57,7 @@ export function MedicationScheduleModal({
   onUpdateTimes,
   onUpdateDuration,
 }: Props) {
+  const { modal: theme } = useAppChromeTheme();
   const [showIntakeDaysPicker, setShowIntakeDaysPicker] = useState(false);
   const [datePickerTarget, setDatePickerTarget] = useState<DatePickerTarget | null>(null);
   const [timePickerIndex, setTimePickerIndex] = useState<number | null>(null);
@@ -308,7 +294,6 @@ export function MedicationScheduleModal({
               embedded
               visible={showIntakeDaysPicker}
               labels={labels}
-              theme={theme}
               weekdayLabels={weekdayLabels}
               initialRepeat={localRepeat}
               onClose={() => setShowIntakeDaysPicker(false)}
@@ -322,7 +307,6 @@ export function MedicationScheduleModal({
         visible={timePickerIndex !== null}
         title={labels.medicationScheduleTime}
         labels={labels}
-        theme={theme}
         initialTime={timePickerIndex !== null ? localTimes[timePickerIndex] : formatTimeValue(new Date())}
         onClose={() => setTimePickerIndex(null)}
         onSelect={(time) => {
@@ -335,7 +319,6 @@ export function MedicationScheduleModal({
         visible={datePickerTarget === 'start'}
         title={labels.medicationScheduleStart}
         labels={labels}
-        theme={theme}
         locale={locale}
         selectedDateKey={localStartKey}
         onClose={() => setDatePickerTarget(null)}
@@ -354,7 +337,6 @@ export function MedicationScheduleModal({
         visible={datePickerTarget === 'end'}
         title={labels.medicationScheduleEnd}
         labels={labels}
-        theme={theme}
         locale={locale}
         selectedDateKey={
           localEndKey && typeof localEndKey === 'string'

@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Dimensions, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { AppLabels } from '@/constants/i18n';
+import { useAppChromeTheme } from '@/hooks/use-app-chrome-theme';
 
 export type CoachMarkTarget = {
   x: number;
@@ -10,23 +11,12 @@ export type CoachMarkTarget = {
   height: number;
 };
 
-type ThemeSlice = {
-  text: string;
-  textSecondary: string;
-  activeBg: string;
-  activeText: string;
-  modalOverlay: string;
-  modalBg: string;
-  subtlePanelBorder: string;
-};
-
 type Props = {
   visible: boolean;
   step: 0 | 1;
   panicTarget: CoachMarkTarget | null;
   infoTarget: CoachMarkTarget | null;
   labels: AppLabels;
-  theme: ThemeSlice;
   onNext: () => void;
   onDismiss: () => void;
 };
@@ -72,10 +62,10 @@ export function CoachMarksOverlay({
   panicTarget,
   infoTarget,
   labels,
-  theme,
   onNext,
   onDismiss,
 }: Props) {
+  const { modal: theme } = useAppChromeTheme();
   const target = step === 0 ? panicTarget : infoTarget;
   const title = step === 0 ? labels.coachMarkPanicTitle : labels.coachMarkInfoTitle;
   const body = step === 0 ? labels.coachMarkPanicBody : labels.coachMarkInfoBody;

@@ -4,26 +4,15 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { AppLabels } from '@/constants/i18n';
 import { Fonts } from '@/constants/theme';
-
-type ThemeSlice = {
-  text: string;
-  textSecondary: string;
-  activeBg: string;
-  activeText: string;
-  modalOverlay: string;
-  modalBg: string;
-  subtlePanelBorder: string;
-};
+import { useAppChromeTheme } from '@/hooks/use-app-chrome-theme';
 
 type LegendLabels = AppLabels & {
-  medicationIntakeLegendSchedule: string;
   medicationIntakeLegendSetTime: string;
 };
 
 type Props = {
   visible: boolean;
   labels: LegendLabels;
-  theme: ThemeSlice;
   onClose: () => void;
 };
 
@@ -31,18 +20,20 @@ type LegendRowProps = {
   icon: ReactNode;
   text: string;
   textColor: string;
+  iconWrapStyle?: object;
 };
 
-function LegendRow({ icon, text, textColor }: LegendRowProps) {
+function LegendRow({ icon, text, textColor, iconWrapStyle }: LegendRowProps) {
   return (
     <View style={styles.legendRow}>
-      <View style={styles.legendIconWrap}>{icon}</View>
+      <View style={[styles.legendIconWrap, iconWrapStyle]}>{icon}</View>
       <Text style={[styles.legendText, { color: textColor }]}>{text}</Text>
     </View>
   );
 }
 
-export function MedicationIntakeLegendModal({ visible, labels, theme, onClose }: Props) {
+export function MedicationIntakeLegendModal({ visible, labels, onClose }: Props) {
+  const { modal: theme } = useAppChromeTheme();
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
       <Pressable style={[styles.overlay, { backgroundColor: theme.modalOverlay }]} onPress={onClose}>
@@ -63,22 +54,25 @@ export function MedicationIntakeLegendModal({ visible, labels, theme, onClose }:
           />
           <LegendRow
             icon={
-              <View style={[styles.checkboxIcon, { backgroundColor: theme.activeBg, borderColor: theme.activeBg }]}>
-                <Ionicons name="checkmark" size={14} color={theme.activeText} />
+              <View style={[styles.takeButtonSample, { backgroundColor: theme.activeBg, borderColor: theme.activeBg }]}>
+                <Text style={[styles.takeButtonSampleText, { color: theme.activeText }]} numberOfLines={1}>
+                  {labels.medicationTake}
+                </Text>
               </View>
             }
             text={labels.medicationIntakeLegendCheck}
             textColor={theme.text}
+            iconWrapStyle={styles.takeButtonIconWrap}
           />
           <LegendRow
-            icon={<View style={[styles.checkboxIcon, styles.checkboxIconEmpty, { borderColor: theme.activeBg }]} />}
-            text={labels.medicationIntakeLegendSchedule}
-            textColor={theme.text}
-          />
-          <LegendRow
-            icon={<Text style={[styles.legendTimeSample, { color: theme.textSecondary }]}>12:30</Text>}
+            icon={
+              <Text style={[styles.legendTimeSample, { color: theme.textSecondary }]} numberOfLines={1}>
+                12:30
+              </Text>
+            }
             text={labels.medicationIntakeLegendTime}
             textColor={theme.text}
+            iconWrapStyle={styles.timeSampleIconWrap}
           />
           <LegendRow
             icon={<Text style={[styles.legendNumberSample, { color: theme.textSecondary }]}>3</Text>}
@@ -134,16 +128,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 2,
   },
-  checkboxIcon: {
-    width: 20,
-    height: 20,
+  takeButtonIconWrap: {
+    width: 72,
+  },
+  timeSampleIconWrap: {
+    width: 40,
+  },
+  takeButtonSample: {
+    minHeight: 28,
     borderRadius: 8,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    alignSelf: 'stretch',
   },
-  checkboxIconEmpty: {
-    backgroundColor: 'transparent',
+  takeButtonSampleText: {
+    fontSize: 11,
+    fontFamily: Fonts.sansSemiBold,
+    lineHeight: 14,
+    textAlign: 'center',
   },
   legendText: {
     flex: 1,
@@ -151,9 +156,10 @@ const styles = StyleSheet.create({
     lineHeight: 19,
   },
   legendTimeSample: {
-    fontSize: 8,
+    fontSize: 11,
     fontFamily: Fonts.mono,
-    lineHeight: 10,
+    lineHeight: 14,
+    textAlign: 'center',
   },
   legendNumberSample: {
     fontSize: 18,

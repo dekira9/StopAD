@@ -79,7 +79,8 @@ export const sectionTitleStyle: TextStyle = {
   ...weekFieldLabelStyle,
 };
 
-export const daySectionLabelColor = '#5b4d5b';
+/** Sage-aligned section label — pair with theme.textSecondary when overriding. */
+export const daySectionLabelColor = '#5A6B62';
 
 export const daySectionLabelStyle: TextStyle = {
   ...sectionTitleStyle,
@@ -99,7 +100,6 @@ export const dayMedicationsStatusStyle: TextStyle = {
   fontFamily: Fonts.condensed,
   color: daySectionLabelColor,
 };
-
 export const dayHeaderTitleStyle: TextStyle = {
   ...weekDayTitleStyle,
 };

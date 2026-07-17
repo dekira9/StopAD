@@ -2,40 +2,28 @@ import { Ionicons } from '@expo/vector-icons';
 import { Modal, Pressable, StyleSheet, Text } from 'react-native';
 
 import type { AppLabels } from '@/constants/i18n';
-
-type ThemeSlice = {
-  text: string;
-  textSecondary: string;
-  activeBg: string;
-  activeText: string;
-  inactiveBg: string;
-  inactiveBorder: string;
-  inactiveText: string;
-  buttonShadow: number;
-  modalOverlay: string;
-  modalBg: string;
-  subtlePanelBorder: string;
-};
+import { useAppChromeTheme } from '@/hooks/use-app-chrome-theme';
 
 type Props = {
   visible: boolean;
   labels: AppLabels;
-  theme: ThemeSlice;
   onClose: () => void;
   onSelectTaken: () => void;
   onSelectSkipped: () => void;
+  onSelectCleared: () => void;
   onOpenSchedule: () => void;
 };
 
 export function MedicationStatusModal({
   visible,
   labels,
-  theme,
   onClose,
   onSelectTaken,
   onSelectSkipped,
+  onSelectCleared,
   onOpenSchedule,
 }: Props) {
+  const { modal: theme } = useAppChromeTheme();
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
       <Pressable style={[styles.overlay, { backgroundColor: theme.modalOverlay }]} onPress={onClose}>
@@ -64,6 +52,17 @@ export function MedicationStatusModal({
             ]}>
             <Ionicons name="close" size={18} color="#ef4444" />
             <Text style={[styles.optionText, { color: theme.inactiveText }]}>{labels.medicationSkipped}</Text>
+          </Pressable>
+
+          <Pressable
+            onPress={onSelectCleared}
+            style={({ pressed }) => [
+              styles.optionRow,
+              { backgroundColor: theme.inactiveBg, borderColor: theme.inactiveBorder },
+              pressed && styles.pressed,
+            ]}>
+            <Ionicons name="remove-circle-outline" size={18} color={theme.text} />
+            <Text style={[styles.optionText, { color: theme.inactiveText }]}>{labels.medicationUnmark}</Text>
           </Pressable>
 
           <Pressable

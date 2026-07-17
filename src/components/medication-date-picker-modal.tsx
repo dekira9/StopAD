@@ -21,27 +21,13 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { AppLabels } from '@/constants/i18n';
 import { Fonts } from '@/constants/theme';
+import { useAppChromeTheme } from '@/hooks/use-app-chrome-theme';
 import { formatMonthYear } from '@/utils/date-format';
-
-type ThemeSlice = {
-  text: string;
-  textSecondary: string;
-  activeBg: string;
-  activeText: string;
-  inactiveBg: string;
-  inactiveBorder: string;
-  inactiveText: string;
-  modalOverlay: string;
-  modalBg: string;
-  subtlePanelBorder: string;
-  buttonShadow: number;
-};
 
 type Props = {
   visible: boolean;
   title: string;
   labels: AppLabels;
-  theme: ThemeSlice;
   locale: Locale;
   selectedDateKey?: string;
   minimumDateKey?: string;
@@ -58,7 +44,6 @@ type ContentProps = Omit<Props, 'visible'>;
 function MedicationDatePickerModalContent({
   title,
   labels,
-  theme,
   locale,
   selectedDateKey,
   minimumDateKey,
@@ -67,6 +52,7 @@ function MedicationDatePickerModalContent({
   onSelect,
   onSelectNone,
 }: ContentProps) {
+  const { modal: theme } = useAppChromeTheme();
   const initialMonth = selectedDateKey
     ? parse(selectedDateKey, 'yyyy-MM-dd', new Date())
     : new Date();

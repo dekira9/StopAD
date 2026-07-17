@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useMemo, useState } from 'react';
+import { Image } from 'expo-image';
+import { useMemo, useState, type ComponentProps } from 'react';
 import {
   Modal,
   Pressable,
@@ -11,47 +12,116 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { LANGUAGES, type AppLabels, type Language } from '@/constants/i18n';
+import { useAppChromeTheme } from '@/hooks/use-app-chrome-theme';
 
 export type OnboardingResult = {
   language: Language;
-};
-
-type ThemeSlice = {
-  text: string;
-  textSecondary: string;
-  activeBg: string;
-  activeText: string;
-  inactiveBg: string;
-  inactiveBorder: string;
-  inactiveText: string;
-  modalBg: string;
-  subtlePanelBg: string;
-  subtlePanelBorder: string;
-  sectionLabelBg: string;
 };
 
 type Props = {
   visible: boolean;
   language: Language;
   labels: AppLabels;
-  theme: ThemeSlice;
   onLanguageChange: (language: Language) => void;
   onLearnMore: () => void;
   onComplete: (result: OnboardingResult) => void;
 };
 
-const STEP_COUNT = 3;
+/** 0 language · 1 hello · 2 not catastrophe · 3 manage · 4 growth rings · 5 week */
+const STEP_COUNT = 6;
+
+type IllustrationName = ComponentProps<typeof Ionicons>['name'];
+
+const RING_ILLUSTRATION_SIZE = 128;
+const RING_ILLUSTRATION_STROKE = 11;
+const RING_ILLUSTRATION_GAP = 4;
+const RING_ILLUSTRATION_COLORS = ['#9BB0A6', '#8FA8B8', '#7A9AAD', '#6B8FA3'] as const;
+const RING_ILLUSTRATION_MUTED = [
+  'rgba(155,176,166,0.35)',
+  'rgba(143,168,184,0.35)',
+  'rgba(122,154,173,0.35)',
+  'rgba(107,143,163,0.35)',
+] as const;
+
+function StepIllustration({
+  name,
+  color,
+  backgroundColor,
+  borderColor,
+}: {
+  name: IllustrationName;
+  color: string;
+  backgroundColor: string;
+  borderColor: string;
+}) {
+  return (
+    <View style={[styles.illustrationWrap, { backgroundColor, borderColor }]}>
+      <Ionicons name={name} size={40} color={color} />
+    </View>
+  );
+}
+
+function GrowthRingsIllustration({
+  centerLabel,
+  captionColor,
+}: {
+  centerLabel: string;
+  captionColor: string;
+}) {
+  return (
+    <View style={styles.ringsIllustrationWrap} accessibilityLabel={centerLabel}>
+      <View style={[styles.ringsCanvas, { width: RING_ILLUSTRATION_SIZE, height: RING_ILLUSTRATION_SIZE }]}>
+        {[4, 3, 2, 1].map((id) => {
+          const index = id - 1;
+          const inset = (4 - id) * (RING_ILLUSTRATION_STROKE + RING_ILLUSTRATION_GAP);
+          const size = RING_ILLUSTRATION_SIZE - inset * 2;
+          // Inner rings are “now”; outer rings hint at wider life
+          const color = id <= 2 ? RING_ILLUSTRATION_COLORS[index] : RING_ILLUSTRATION_MUTED[index];
+
+          return (
+            <View
+              key={id}
+              pointerEvents="none"
+              style={[
+                styles.ringVisual,
+                {
+                  width: size,
+                  height: size,
+                  borderRadius: size / 2,
+                  borderWidth: RING_ILLUSTRATION_STROKE,
+                  borderColor: color,
+                  top: inset,
+                  left: inset,
+                },
+              ]}
+            />
+          );
+        })}
+        <View
+          pointerEvents="none"
+          style={[
+            styles.ringsCenter,
+            {
+              backgroundColor: RING_ILLUSTRATION_COLORS[0],
+            },
+          ]}
+        />
+      </View>
+      <Text style={[styles.ringsCaption, { color: captionColor }]}>{centerLabel}</Text>
+    </View>
+  );
+}
 
 export function OnboardingModal({
   visible,
   language,
   labels,
-  theme,
   onLanguageChange,
   onLearnMore,
   onComplete,
 }: Props) {
   const insets = useSafeAreaInsets();
+  const { modal: theme } = useAppChromeTheme();
   const [step, setStep] = useState(0);
 
   const finish = () => {
@@ -73,9 +143,15 @@ export function OnboardingModal({
       case 0:
         return labels.onboardingLanguageTitle;
       case 1:
-        return labels.onboardingSlide1Title;
-      default:
+        return labels.appName;
+      case 2:
         return labels.onboardingSlide2Title;
+      case 3:
+        return labels.onboardingSlide3Title;
+      case 4:
+        return labels.onboardingSlide4Title;
+      default:
+        return labels.onboardingSlide5Title;
     }
   }, [labels, step]);
 
@@ -85,10 +161,31 @@ export function OnboardingModal({
         return labels.onboardingLanguageHint;
       case 1:
         return labels.onboardingSlide1Body;
-      default:
+      case 2:
         return labels.onboardingSlide2Body;
+      case 3:
+        return labels.onboardingSlide3Body;
+      case 4:
+        return labels.onboardingSlide4Body;
+      default:
+        return labels.onboardingSlide5Body;
     }
   }, [labels, step]);
+
+  const illustration = useMemo(() => {
+    switch (step) {
+      case 1:
+        return 'hand-left-outline' as const;
+      case 2:
+        return 'shield-checkmark-outline' as const;
+      case 3:
+        return 'leaf-outline' as const;
+      case 5:
+        return 'calendar-outline' as const;
+      default:
+        return null;
+    }
+  }, [step]);
 
   return (
     <Modal visible={visible} animationType="fade" onRequestClose={finish}>
@@ -124,7 +221,7 @@ export function OnboardingModal({
             ))}
           </View>
           <View style={[styles.topBarSide, styles.topBarSideRight]}>
-            {step < STEP_COUNT - 1 ? (
+            {step > 0 && step < STEP_COUNT - 1 ? (
               <Pressable
                 onPress={finish}
                 hitSlop={8}
@@ -139,10 +236,40 @@ export function OnboardingModal({
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled">
-          <Text style={[styles.title, { color: theme.text }]}>{stepTitle}</Text>
+          {step === 1 ? (
+            <View style={styles.brandArtWrap}>
+              <Image
+                source={require('@/assets/images/icon.png')}
+                style={styles.brandArt}
+                contentFit="contain"
+                accessibilityIgnoresInvertColors
+              />
+            </View>
+          ) : null}
+
+          {step === 4 ? (
+            <GrowthRingsIllustration
+              centerLabel={labels.onboardingSlide4RingHint}
+              captionColor={theme.textSecondary}
+            />
+          ) : null}
+
+          {illustration && step !== 1 ? (
+            <StepIllustration
+              name={illustration}
+              color={theme.activeBg}
+              backgroundColor={theme.subtlePanelBg}
+              borderColor={theme.subtlePanelBorder}
+            />
+          ) : null}
+
+          <Text style={[step === 1 ? styles.brandTitle : styles.title, { color: theme.text }]}>{stepTitle}</Text>
+          {step === 1 ? (
+            <Text style={[styles.brandTagline, { color: theme.activeBg }]}>{labels.appTagline}</Text>
+          ) : null}
           <Text style={[styles.body, { color: theme.textSecondary }]}>{stepBody}</Text>
 
-          {step === 1 ? (
+          {step === 3 ? (
             <Pressable onPress={onLearnMore} style={({ pressed }) => [styles.learnMoreBtn, pressed && styles.pressed]}>
               <Text style={[styles.learnMoreText, { color: theme.activeBg }]}>{labels.onboardingLearnMore}</Text>
               <Ionicons name="chevron-forward" size={14} color={theme.activeBg} />
@@ -151,6 +278,7 @@ export function OnboardingModal({
 
           {step === 0 ? (
             <View style={styles.langList}>
+              <Text style={[styles.langBrandMark, { color: theme.activeBg }]}>{labels.appName}</Text>
               {(Object.keys(LANGUAGES) as Language[]).map((lang) => {
                 const active = language === lang;
                 return (
@@ -194,7 +322,7 @@ export function OnboardingModal({
                 { backgroundColor: theme.activeBg, borderColor: theme.activeBg },
                 pressed && styles.pressed,
               ]}>
-              <Text style={[styles.primaryButtonText, { color: theme.activeText }]}>{labels.done}</Text>
+              <Text style={[styles.primaryButtonText, { color: theme.activeText }]}>{labels.onboardingStart}</Text>
             </Pressable>
           )}
         </View>
@@ -220,11 +348,59 @@ const styles = StyleSheet.create({
   textBtnLabel: { fontSize: 12, fontWeight: '700' },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 24, paddingBottom: 24, gap: 12 },
+  brandArtWrap: {
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  brandArt: {
+    width: 112,
+    height: 112,
+    borderRadius: 28,
+  },
+  brandTitle: { fontSize: 32, fontWeight: '800', lineHeight: 38, letterSpacing: -0.3 },
+  brandTagline: { fontSize: 15, fontWeight: '700', lineHeight: 21, marginTop: -4 },
+  illustrationWrap: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  ringsIllustrationWrap: {
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 4,
+    gap: 10,
+  },
+  ringsCanvas: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ringVisual: {
+    position: 'absolute',
+  },
+  ringsCenter: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+  },
+  ringsCaption: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
   title: { fontSize: 24, fontWeight: '700', lineHeight: 30 },
   body: { fontSize: 15, lineHeight: 22 },
   learnMoreBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
   learnMoreText: { fontSize: 13, fontWeight: '700' },
   langList: { gap: 8, marginTop: 8 },
+  langBrandMark: { fontSize: 20, fontWeight: '800', marginBottom: 4, letterSpacing: -0.2 },
   langRow: {
     flexDirection: 'row',
     alignItems: 'center',

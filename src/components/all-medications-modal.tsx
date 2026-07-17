@@ -6,25 +6,12 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 
 import type { AppLabels } from '@/constants/i18n';
 import { Fonts } from '@/constants/theme';
 import { formatSectionTitle, weekButtonTextStyle, weekDayTitleStyle, weekFieldLabelStyle } from '@/constants/typography';
+import { useAppChromeTheme } from '@/hooks/use-app-chrome-theme';
 import {
   formatMedicationLabel,
   type MedicationCatalogEntry,
   wellnessStore,
 } from '@/stores/wellness-store';
-
-type ThemeSlice = {
-  text: string;
-  textSecondary: string;
-  activeBg: string;
-  activeText: string;
-  inactiveBg: string;
-  inactiveBorder: string;
-  inactiveText: string;
-  buttonShadow: number;
-  modalOverlay: string;
-  modalBg: string;
-  subtlePanelBorder: string;
-};
 
 type AllMedicationsLabels = AppLabels & {
   allMedicationsCurrent: string;
@@ -34,7 +21,6 @@ type AllMedicationsLabels = AppLabels & {
 type Props = {
   visible: boolean;
   labels: AllMedicationsLabels;
-  theme: ThemeSlice;
   onClose: () => void;
   onOpenSchedule: (entry: MedicationCatalogEntry) => void;
 };
@@ -46,7 +32,8 @@ function loadVisibleMedicationEntries() {
 
 type ContentProps = Omit<Props, 'visible'>;
 
-function AllMedicationsModalContent({ labels, theme, onClose, onOpenSchedule }: ContentProps) {
+function AllMedicationsModalContent({ labels, onClose, onOpenSchedule }: ContentProps) {
+  const { modal: theme } = useAppChromeTheme();
   const [entries, setEntries] = useState<MedicationCatalogEntry[]>(loadVisibleMedicationEntries);
 
   const loadEntries = useCallback(() => {
@@ -232,14 +219,13 @@ function AllMedicationsModalContent({ labels, theme, onClose, onOpenSchedule }: 
   );
 }
 
-export function AllMedicationsModal({ visible, labels, theme, onClose, onOpenSchedule }: Props) {
+export function AllMedicationsModal({ visible, labels, onClose, onOpenSchedule }: Props) {
   return (
     <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
       {visible ? (
         <AllMedicationsModalContent
           key="all-medications-open"
           labels={labels}
-          theme={theme}
           onClose={onClose}
           onOpenSchedule={onOpenSchedule}
         />

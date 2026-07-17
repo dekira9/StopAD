@@ -205,18 +205,6 @@ export function SleepInput({ label, value, labels, theme, onChange, onOpenNightO
         visible={pickerTarget !== null}
         title={labels.selectTime}
         labels={labels}
-        theme={{
-          text: theme.text,
-          textSecondary: theme.textSecondary,
-          activeBg: theme.activeBg,
-          activeText: theme.activeText,
-          inactiveBg: theme.inactiveBg,
-          inactiveBorder: theme.inactiveBorder,
-          inactiveText: theme.inactiveText,
-          modalOverlay: theme.modalOverlay,
-          modalBg: theme.modalBg,
-          subtlePanelBorder: theme.subtlePanelBorder,
-        }}
         initialTime={pickerInitialTime}
         onClose={() => setPickerTarget(null)}
         onSelect={(time) => {

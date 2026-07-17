@@ -6,25 +6,12 @@ import { Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native
 
 import type { AppLabels } from '@/constants/i18n';
 import { Colors } from '@/constants/theme';
-
-type ThemeSlice = {
-  text: string;
-  textSecondary: string;
-  activeBg: string;
-  activeText: string;
-  inactiveBg: string;
-  inactiveBorder: string;
-  inactiveText: string;
-  modalOverlay: string;
-  modalBg: string;
-  subtlePanelBorder: string;
-};
+import { useAppChromeTheme } from '@/hooks/use-app-chrome-theme';
 
 type Props = {
   visible: boolean;
   title: string;
   labels: AppLabels;
-  theme: ThemeSlice;
   initialTime: string;
   onClose: () => void;
   onSelect: (time: string) => void;
@@ -47,11 +34,11 @@ type ContentProps = Omit<Props, 'visible'>;
 function MedicationTimePickerModalContent({
   title,
   labels,
-  theme,
   initialTime,
   onClose,
   onSelect,
 }: ContentProps) {
+  const { modal: theme } = useAppChromeTheme();
   const [pickerValue, setPickerValue] = useState(() => parseTimeValue(initialTime));
 
   if (Platform.OS === 'android') {

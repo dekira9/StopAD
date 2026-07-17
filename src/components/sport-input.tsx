@@ -86,7 +86,7 @@ export function SportInput({ label, value, labels, theme, onChange, hideLabel }:
     return (
       <View
         key={activity.id}
-        style={[styles.activityCard, { borderColor: theme.inactiveBorder, backgroundColor: theme.inactiveBg }]}>
+        style={[styles.activityCard, { borderColor: theme.inactiveBorder, backgroundColor: theme.sectionLabelBg }]}>
         <View style={styles.activityHeader}>
           <Text style={[styles.activityTitle, { color: theme.textSecondary }]}>{labels.sportActivityType}</Text>
           <Pressable
@@ -150,7 +150,10 @@ export function SportInput({ label, value, labels, theme, onChange, hideLabel }:
             placeholder="0"
             placeholderTextColor={theme.textSecondary}
             keyboardType="number-pad"
-            style={[styles.durationInput, { color: theme.text, borderColor: theme.inactiveBorder }]}
+            style={[
+              styles.durationInput,
+              { color: theme.text, borderColor: theme.inactiveBorder, backgroundColor: theme.inactiveBg },
+            ]}
           />
           <Text style={[styles.durationUnit, { color: theme.textSecondary }]}>{labels.sleepHoursShort}</Text>
           <TextInput
@@ -159,7 +162,10 @@ export function SportInput({ label, value, labels, theme, onChange, hideLabel }:
             placeholder="0"
             placeholderTextColor={theme.textSecondary}
             keyboardType="number-pad"
-            style={[styles.durationInput, { color: theme.text, borderColor: theme.inactiveBorder }]}
+            style={[
+              styles.durationInput,
+              { color: theme.text, borderColor: theme.inactiveBorder, backgroundColor: theme.inactiveBg },
+            ]}
           />
           <Text style={[styles.durationUnit, { color: theme.textSecondary }]}>{labels.sleepMinutesShort}</Text>
         </View>
@@ -173,7 +179,10 @@ export function SportInput({ label, value, labels, theme, onChange, hideLabel }:
               placeholder={`... ${labels.sportStepsPlaceholder.toLocaleLowerCase()}`}
               placeholderTextColor={theme.iconMuted}
               keyboardType="number-pad"
-              style={[styles.stepsInput, { color: theme.text, borderColor: theme.inactiveBorder }]}
+              style={[
+                styles.stepsInput,
+                { color: theme.text, borderColor: theme.inactiveBorder, backgroundColor: theme.inactiveBg },
+              ]}
             />
           </>
         ) : null}

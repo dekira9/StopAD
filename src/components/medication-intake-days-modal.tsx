@@ -4,30 +4,17 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { AppLabels } from '@/constants/i18n';
 import { Fonts } from '@/constants/theme';
+import { useAppChromeTheme } from '@/hooks/use-app-chrome-theme';
 import type { MedicationRepeatConfig } from '@/stores/wellness-store';
 import { buildRepeatFromIntakeMode, getIntakeMode, type IntakeMode } from '@/utils/medication-intake';
 
 const WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0] as const;
 const INTERVAL_OPTIONS = [2, 3, 4, 5, 7] as const;
 
-type ThemeSlice = {
-  text: string;
-  textSecondary: string;
-  activeBg: string;
-  activeText: string;
-  inactiveBg: string;
-  inactiveBorder: string;
-  inactiveText: string;
-  modalOverlay: string;
-  modalBg: string;
-  subtlePanelBorder: string;
-};
-
 type Props = {
   visible: boolean;
   embedded?: boolean;
   labels: AppLabels;
-  theme: ThemeSlice;
   weekdayLabels: string[];
   initialRepeat: MedicationRepeatConfig;
   onClose: () => void;
@@ -46,12 +33,12 @@ function getInitialIntervalDays(initialRepeat: MedicationRepeatConfig): number {
 
 function MedicationIntakeDaysModalContent({
   labels,
-  theme,
   weekdayLabels,
   initialRepeat,
   onClose,
   onApply,
 }: ContentProps) {
+  const { modal: theme } = useAppChromeTheme();
   const [mode, setMode] = useState<IntakeMode>(() => getIntakeMode(initialRepeat));
   const [daysOfWeek, setDaysOfWeek] = useState<number[]>(() => getInitialDaysOfWeek(initialRepeat));
   const [intervalDays, setIntervalDays] = useState<number>(() => getInitialIntervalDays(initialRepeat));
@@ -178,7 +165,6 @@ export function MedicationIntakeDaysModal({
   visible,
   embedded = false,
   labels,
-  theme,
   weekdayLabels,
   initialRepeat,
   onClose,
@@ -193,7 +179,6 @@ export function MedicationIntakeDaysModal({
         <MedicationIntakeDaysModalContent
           key={key}
           labels={labels}
-          theme={theme}
           weekdayLabels={weekdayLabels}
           initialRepeat={initialRepeat}
           onClose={onClose}
@@ -209,7 +194,6 @@ export function MedicationIntakeDaysModal({
         <MedicationIntakeDaysModalContent
           key={key}
           labels={labels}
-          theme={theme}
           weekdayLabels={weekdayLabels}
           initialRepeat={initialRepeat}
           onClose={onClose}

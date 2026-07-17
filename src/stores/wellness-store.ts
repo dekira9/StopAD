@@ -8,8 +8,10 @@ import {
 import { makeAutoObservable, runInAction, toJS } from 'mobx';
 import { Platform } from 'react-native';
 
+import { APP_NAME } from '@/constants/brand';
 import type { Language } from '@/constants/i18n';
 import { rescheduleMedicationReminders } from '@/services/notifications';
+import { emptyGrowthRingsLog, normalizeGrowthRingsLog, type GrowthRingsLog } from '@/utils/growth-ring-log';
 import { normalizeDayLogPanicAttack } from '@/utils/panic-attack-log';
 
 const STORAGE_KEY = 'stop-ad-v1';
@@ -85,6 +87,8 @@ export type DayLog = {
   sport: string;
   events: string;
   panicAttackCount?: number;
+  /** Independent from diary fields — only “Where am I today” selections. */
+  growthRings?: GrowthRingsLog;
 };
 
 export type DayLogs = {
@@ -317,7 +321,7 @@ class WellnessStore {
   hydrated = false;
   private persistQueue: Promise<void> = Promise.resolve();
   private reminderLabels: ReminderLabels = {
-    notificationTitle: 'Hi, Anxiety',
+    notificationTitle: APP_NAME,
     notificationBody: 'Time to take:',
   };
 
@@ -400,8 +404,11 @@ class WellnessStore {
       runInAction(() => {
         if (!hasLocalState) {
           const days = parsed.days ?? {};
-          for (const day of Object.values(days)) {
+          for (const day of Object.values(days) as DayLog[]) {
             normalizeDayLogPanicAttack(day as Record<string, unknown>);
+            if (day.growthRings) {
+              day.growthRings = normalizeGrowthRingsLog(day.growthRings);
+            }
           }
           this.days = days;
           this.weeklySummary = parsed.weeklySummary ?? {};
@@ -1000,6 +1007,20 @@ class WellnessStore {
     this.schedulePersist();
   }
 
+  setGrowthRings(dateKey: string, growthRings: GrowthRingsLog) {
+    const day = this.ensureDay(dateKey);
+    this.days = {
+      ...this.days,
+      [dateKey]: { ...day, growthRings: normalizeGrowthRingsLog(growthRings) },
+    };
+    this.schedulePersist();
+  }
+
+  getGrowthRings(dateKey: string): GrowthRingsLog {
+    const day = this.days[dateKey];
+    return day?.growthRings ? normalizeGrowthRingsLog(day.growthRings) : emptyGrowthRingsLog();
+  }
+
   setPanicAttackCount(dateKey: string, count: number) {
     const day = this.ensureDay(dateKey);
     const panicAttackCount = Math.max(0, Math.floor(count));
@@ -1100,7 +1121,7 @@ class WellnessStore {
     }
   }
 
-  setMedicationStatus(dateKey: string, rowId: string, idx: number, status: 'taken' | 'skipped') {
+  setMedicationStatus(dateKey: string, rowId: string, idx: number, status: 'taken' | 'skipped' | 'cleared') {
     const day = this.ensureDay(dateKey);
     const meds = [...day.medications];
 
