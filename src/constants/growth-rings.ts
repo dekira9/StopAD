@@ -37,7 +37,6 @@ export const GROWTH_RINGS: readonly GrowthRingDefinition[] = [
       'small-relief',
       'hope',
       'anxiety',
-      'uncertainty',
       'fear-of-symptoms',
       'constant-vigilance',
       'relief-after-home',

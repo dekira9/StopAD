@@ -87,7 +87,6 @@ function MedicationIntakeDaysModalContent({
 
         {renderModeOption('everyDay', labels.repeatEveryDay)}
         {renderModeOption('weekdays', labels.medicationIntakeWeekdays)}
-        {renderModeOption('interval', labels.medicationIntakeInterval)}
 
         {mode === 'weekdays' ? (
           <View style={styles.weekdayRow}>
@@ -111,6 +110,8 @@ function MedicationIntakeDaysModalContent({
             })}
           </View>
         ) : null}
+
+        {renderModeOption('interval', labels.medicationIntakeInterval)}
 
         {mode === 'interval' ? (
           <View style={styles.intervalRow}>

@@ -11,7 +11,6 @@ type Props = {
   onSelectTaken: () => void;
   onSelectSkipped: () => void;
   onSelectCleared: () => void;
-  onOpenSchedule: () => void;
 };
 
 export function MedicationStatusModal({
@@ -21,7 +20,6 @@ export function MedicationStatusModal({
   onSelectTaken,
   onSelectSkipped,
   onSelectCleared,
-  onOpenSchedule,
 }: Props) {
   const { modal: theme } = useAppChromeTheme();
   return (
@@ -36,11 +34,11 @@ export function MedicationStatusModal({
             onPress={onSelectTaken}
             style={({ pressed }) => [
               styles.optionRow,
-              { backgroundColor: theme.activeBg, borderColor: theme.activeBg },
+              { backgroundColor: theme.inactiveBg, borderColor: theme.inactiveBorder },
               pressed && styles.pressed,
             ]}>
-            <Ionicons name="checkmark" size={18} color={theme.activeText} />
-            <Text style={[styles.optionText, { color: theme.activeText }]}>{labels.medicationTaken}</Text>
+            <Ionicons name="checkmark" size={18} color={theme.activeBg} />
+            <Text style={[styles.optionText, { color: theme.inactiveText }]}>{labels.medicationTaken}</Text>
           </Pressable>
 
           <Pressable
@@ -63,17 +61,6 @@ export function MedicationStatusModal({
             ]}>
             <Ionicons name="remove-circle-outline" size={18} color={theme.text} />
             <Text style={[styles.optionText, { color: theme.inactiveText }]}>{labels.medicationUnmark}</Text>
-          </Pressable>
-
-          <Pressable
-            onPress={onOpenSchedule}
-            style={({ pressed }) => [
-              styles.optionRow,
-              { backgroundColor: theme.inactiveBg, borderColor: theme.inactiveBorder },
-              pressed && styles.pressed,
-            ]}>
-            <Ionicons name="calendar-outline" size={18} color={theme.text} />
-            <Text style={[styles.optionText, { color: theme.inactiveText }]}>{labels.medicationScheduleButton}</Text>
           </Pressable>
 
           <Pressable

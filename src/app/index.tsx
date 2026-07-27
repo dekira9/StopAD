@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { observer } from 'mobx-react-lite';
-import { useCallback, useEffect, useMemo, useRef, useState, Fragment } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
@@ -25,6 +25,7 @@ import { DaySectionCollapsible } from '@/components/day-section-collapsible';
 import { ExpandableInput } from '@/components/expandable-input';
 import { GrowthRingsSection } from '@/components/growth-rings-section';
 import { ImportantInfoModal } from '@/components/important-info-modal';
+import { BellOffIcon, BellOnIcon, MedicationsIcon, PillIcon, ScheduleIcon } from '@/components/medical-ui-icons';
 import { MedicationIntakeLegendModal } from '@/components/medication-intake-legend-modal';
 import { MedicationScheduleModal } from '@/components/medication-schedule-modal';
 import { MedicationStatusModal } from '@/components/medication-status-modal';
@@ -43,7 +44,6 @@ import { Fonts, getDayWeekBackground, MaxContentWidth, type WeekdayIndex } from 
 import {
   dayHeaderTitleStyle,
   dayMedicationsHeaderStyle,
-  dayMedicationsStatusStyle,
   daySectionLabelStyle,
   formatSectionTitle,
   sectionTitleStyle,
@@ -58,7 +58,7 @@ import {
 } from '@/constants/typography';
 import { useAppChromeTheme } from '@/hooks/use-app-chrome-theme';
 import { ensureNotificationPermissions } from '@/services/notifications';
-import { DEFAULT_MEDICATION_ROWS, formatMedicationLabel, parseMedicationLabel, wellnessStore, type MedicationRow } from '@/stores/wellness-store';
+import { DEFAULT_MEDICATION_REPEAT, DEFAULT_MEDICATION_ROWS, formatMedicationLabel, parseMedicationLabel, wellnessStore, type MedicationRow } from '@/stores/wellness-store';
 import { formatMonthName, formatWeekDayRange } from '@/utils/date-format';
 import { getDayProgress } from '@/utils/day-progress';
 import {
@@ -149,16 +149,6 @@ function DayCelebrationBanner({
   );
 }
 
-function generateSafeId(dateKey: string, baseIndex: number, existing: MedicationRow[]) {
-  let newId = `med-${dateKey}-${baseIndex}`;
-  let suffix = 0;
-  while (existing.some((r) => r.id === newId)) {
-    suffix++;
-    newId = `med-${dateKey}-${baseIndex}-${suffix}`;
-  }
-  return newId;
-}
-
 type DisplayMedicationRow = {
   row: MedicationRow;
   originalIndex: number;
@@ -219,13 +209,24 @@ function HomeScreen() {
   const [statusTarget, setStatusTarget] = useState<{ dateKey: string; rowId: string; idx: number } | null>(null);
   const [showMedicationSchedule, setShowMedicationSchedule] = useState(false);
   const [showAllMedications, setShowAllMedications] = useState(false);
+  const [pendingStockSetupCatalogId, setPendingStockSetupCatalogId] = useState<string | null>(null);
   const [showImportantInfo, setShowImportantInfo] = useState(false);
   const [showMedicationIntakeLegend, setShowMedicationIntakeLegend] = useState(false);
   const [showPanicAttack, setShowPanicAttack] = useState(false);
   const [isExportingWeeklyPdf, setIsExportingWeeklyPdf] = useState(false);
   const [catalogScheduleTarget, setCatalogScheduleTarget] = useState<{
+    catalogId: string;
     medication: string;
     time: string;
+  } | null>(null);
+  const [scheduleDraft, setScheduleDraft] = useState<{
+    dateKey: string;
+    returnToAllMedications?: boolean;
+  } | null>(null);
+  const [scheduleRowTarget, setScheduleRowTarget] = useState<{
+    dateKey: string;
+    rowId: string;
+    idx: number;
   } | null>(null);
   const [coachMarkStep, setCoachMarkStep] = useState<0 | 1>(0);
   const [panicCoachTarget, setPanicCoachTarget] = useState<CoachMarkTarget | null>(null);
@@ -463,6 +464,11 @@ function HomeScreen() {
     };
   }, [weekDays, locale]);
 
+  // Recompute when medication labels/plans change so schedule edits never keep a stale name.
+  const medicationDays = wellnessStore.days;
+  const medicationPlans = wellnessStore.weekMedicationPlans;
+  const medicationCatalog = wellnessStore.medicationCatalog;
+
   const scheduleContext = useMemo(() => {
     const weekdayLabels = weekDays.map((dayItem) => format(dayItem, 'EEE', { locale }).toUpperCase());
 
@@ -471,10 +477,32 @@ function HomeScreen() {
     let fallbackWeekKey = currentWeekKey;
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     let defaultDurationStart = todayKey;
+    let mode: 'edit' | 'create' = 'edit';
+    let scheduleIdentity = '';
 
-    if (catalogScheduleTarget) {
-      medName = catalogScheduleTarget.medication.trim();
+    if (scheduleDraft) {
+      mode = 'create';
+      medName = '';
+      scheduleIdentity = `create-${scheduleDraft.dateKey}`;
+      fallbackWeekKey = format(
+        startOfWeek(parse(scheduleDraft.dateKey, 'yyyy-MM-dd', new Date()), { weekStartsOn: 1 }),
+        'yyyy-MM-dd',
+      );
+      defaultDurationStart = scheduleDraft.dateKey;
+      row = {
+        id: 'new-schedule',
+        time: '',
+        medication: '',
+        taken: false,
+        reminderEnabled: true,
+      };
+    } else if (catalogScheduleTarget) {
+      const catalogEntry = medicationCatalog.find((entry) => entry.id === catalogScheduleTarget.catalogId);
+      medName = catalogEntry
+        ? catalogEntryMedicationLabel(catalogEntry).trim()
+        : catalogScheduleTarget.medication.trim();
       if (!medName) return null;
+      scheduleIdentity = `catalog-${catalogScheduleTarget.catalogId}`;
       row = {
         id: 'catalog-schedule',
         time: catalogScheduleTarget.time?.trim() ?? '',
@@ -482,19 +510,23 @@ function HomeScreen() {
         taken: false,
         reminderEnabled: true,
       };
-    } else if (statusTarget) {
-      const day = wellnessStore.getDay(statusTarget.dateKey);
+    } else if (scheduleRowTarget) {
+      const day = wellnessStore.getDay(scheduleRowTarget.dateKey);
       row =
-        day.medications.find((medicationRow) => medicationRow.id === statusTarget.rowId) ??
-        day.medications[statusTarget.idx];
+        day.medications.find((medicationRow) => medicationRow.id === scheduleRowTarget.rowId) ??
+        day.medications[scheduleRowTarget.idx];
       if (!row) return null;
       medName = row.medication.trim();
+      scheduleIdentity = `row-${scheduleRowTarget.dateKey}-${scheduleRowTarget.rowId}`;
       fallbackWeekKey = format(
-        startOfWeek(parse(statusTarget.dateKey, 'yyyy-MM-dd', new Date()), { weekStartsOn: 1 }),
+        startOfWeek(parse(scheduleRowTarget.dateKey, 'yyyy-MM-dd', new Date()), { weekStartsOn: 1 }),
         'yyyy-MM-dd',
       );
       defaultDurationStart = todayKey;
-      row = { ...row, time: wellnessStore.resolveMedicationRowTime(statusTarget.dateKey, row, statusTarget.idx) };
+      row = {
+        ...row,
+        time: wellnessStore.resolveMedicationRowTime(scheduleRowTarget.dateKey, row, scheduleRowTarget.idx),
+      };
     } else {
       return null;
     }
@@ -506,21 +538,48 @@ function HomeScreen() {
         : row.time?.trim()
           ? [row.time.trim()]
           : [''];
-    const repeat = schedule.repeat;
+    const repeat =
+      mode === 'create'
+        ? {
+            ...DEFAULT_MEDICATION_REPEAT,
+            startDateKey: defaultDurationStart,
+            endDateKey: defaultDurationStart,
+          }
+        : schedule.repeat;
     const intakeDaysSummary = formatIntakeDaysSummary(repeat, t, weekdayLabels);
 
     return {
       row: { ...row, time: times[0] },
       repeat,
       intakeDaysSummary,
-      weekKey: schedule.planWeekKey,
+      weekKey: mode === 'create' ? fallbackWeekKey : schedule.planWeekKey,
       durationStartKey: repeat.startDateKey ?? defaultDurationStart,
       times,
+      mode,
+      draftDateKey: scheduleDraft?.dateKey ?? null,
+      scheduleIdentity,
+      reminderEnabled:
+        mode === 'create'
+          ? true
+          : schedule.times.length > 0
+            ? schedule.reminderEnabled
+            : row.reminderEnabled,
     };
-  }, [catalogScheduleTarget, statusTarget, weekDays, locale, t, currentWeekKey]);
+  }, [
+    catalogScheduleTarget,
+    scheduleDraft,
+    scheduleRowTarget,
+    weekDays,
+    locale,
+    t,
+    currentWeekKey,
+    medicationDays,
+    medicationPlans,
+    medicationCatalog,
+  ]);
 
   useEffect(() => {
-    if (!showMedicationSchedule || !scheduleContext) return;
+    if (!showMedicationSchedule || !scheduleContext || scheduleContext.mode === 'create') return;
     if (scheduleContext.row.time?.trim()) return;
     wellnessStore.setMedicationIntakeTimes(
       scheduleContext.weekKey,
@@ -695,6 +754,34 @@ function HomeScreen() {
         </DaySectionCollapsible>
 
         <DaySectionCollapsible
+          title={formatSectionTitle(t.sport)}
+          summary={sportSummary}
+          open={isSectionOpen(dateKey, 'sport')}
+          onToggle={() => toggleDayNotesSection(dateKey, 'sport')}
+          theme={noteSectionTheme}
+          shadowOpacity={ui.panelEdgeShadow}>
+          <SportInput
+            label={t.sport}
+            value={sportValue}
+            labels={t}
+            hideLabel
+            theme={{
+              text: theme.text,
+              textSecondary: theme.textSecondary,
+              activeBg: ui.activeBg,
+              activeText: ui.activeText,
+              inactiveBg: ui.inactiveBg,
+              inactiveBorder: ui.inactiveBorder,
+              inactiveText: ui.inactiveText,
+              sectionLabelBg: ui.sectionLabelBg,
+              rowBorder: ui.rowBorder,
+              iconMuted: ui.iconMuted,
+            }}
+            onChange={(text) => wellnessStore.updateDayField(dateKey, 'sport', text)}
+          />
+        </DaySectionCollapsible>
+
+        <DaySectionCollapsible
           title={formatSectionTitle(t.triggers)}
           summary={triggersSummary}
           open={isSectionOpen(dateKey, 'triggers')}
@@ -720,34 +807,6 @@ function HomeScreen() {
               iconMuted: ui.iconMuted,
             }}
             onChange={(text) => wellnessStore.updateDayField(dateKey, 'triggers', text)}
-          />
-        </DaySectionCollapsible>
-
-        <DaySectionCollapsible
-          title={formatSectionTitle(t.sport)}
-          summary={sportSummary}
-          open={isSectionOpen(dateKey, 'sport')}
-          onToggle={() => toggleDayNotesSection(dateKey, 'sport')}
-          theme={noteSectionTheme}
-          shadowOpacity={ui.panelEdgeShadow}>
-          <SportInput
-            label={t.sport}
-            value={sportValue}
-            labels={t}
-            hideLabel
-            theme={{
-              text: theme.text,
-              textSecondary: theme.textSecondary,
-              activeBg: ui.activeBg,
-              activeText: ui.activeText,
-              inactiveBg: ui.inactiveBg,
-              inactiveBorder: ui.inactiveBorder,
-              inactiveText: ui.inactiveText,
-              sectionLabelBg: ui.sectionLabelBg,
-              rowBorder: ui.rowBorder,
-              iconMuted: ui.iconMuted,
-            }}
-            onChange={(text) => wellnessStore.updateDayField(dateKey, 'sport', text)}
           />
         </DaySectionCollapsible>
 
@@ -783,8 +842,13 @@ function HomeScreen() {
             <View
               style={[
                 styles.stickyHeader,
-                { borderColor: ui.dayBorder, backgroundColor: ui.contentBg, shadowOpacity: ui.panelEdgeShadow },
+                { borderColor: ui.dayBorder, shadowOpacity: ui.panelEdgeShadow },
               ]}>
+              <Image
+                source={require('@/assets/images/mint cloud23.jpg')}
+                style={styles.stickyHeaderBg}
+                contentFit="cover"
+              />
               <View style={styles.header}>
                 <View style={styles.headerRow}>
                   {mainTab === 'today' ? (
@@ -811,7 +875,7 @@ function HomeScreen() {
                         { color: theme.text },
                       ]}
                       numberOfLines={2}>
-                      {mainTab === 'today' ? t.today : weekHeaderLabel.monthTitle}
+                      {mainTab === 'today' ? t.today : formatSectionTitle(weekHeaderLabel.monthTitle)}
                     </Text>
                     <Text style={[styles.monthYear, { color: theme.textSecondary }]} numberOfLines={2}>
                       {mainTab === 'today'
@@ -925,32 +989,16 @@ function HomeScreen() {
                 const isSunday = getDay(day) === 0;
                 const adherence = wellnessStore.getMedicationAdherence(dateKey);
 
-                const displayCount = Math.max(storedMeds.length, DEFAULT_MEDICATION_ROWS);
-                const medRows: DisplayMedicationRow[] = Array.from({ length: displayCount })
-                  .map((_, idx) => {
-                    const row =
-                      storedMeds[idx] ??
-                      {
-                        id: generateSafeId(dateKey, idx, storedMeds),
-                        time: '',
-                        medication: '',
-                        taken: false,
-                        skipped: false,
-                        reminderEnabled: true,
-                      };
-
-                    return {
-                      row,
-                      originalIndex: idx,
-                      displayTime: wellnessStore.resolveMedicationRowTime(dateKey, row, idx),
-                    };
-                  })
+                const medRows: DisplayMedicationRow[] = storedMeds
+                  .map((row, idx) => ({
+                    row,
+                    originalIndex: idx,
+                    displayTime: wellnessStore.resolveMedicationRowTime(dateKey, row, idx),
+                  }))
                   .sort(compareMedicationDisplayRows);
 
                 const weekdayIndex = getDay(day) as WeekdayIndex;
                 const dayWeekBg = getDayWeekBackground(isDark, weekdayIndex);
-                const filledMeds = medRows.filter((item) => item.row.medication.trim());
-                const takenMedsCount = filledMeds.filter((item) => item.row.taken).length;
                 const nextDose = isToday ? findNextDose(medRows) : null;
                 const dayProgress = isToday ? getDayProgress(storedDay) : null;
                 const dayCelebrationMessage =
@@ -989,12 +1037,12 @@ function HomeScreen() {
                         <Text
                           style={[
                             styles.dayHeaderText,
-                            { color: theme.text },
+                            { color: theme.weekdayName },
                             isReviewMode && isPastDay ? { textDecorationLine: 'line-through', opacity: 0.4 } : null,
                           ]}>
                           {formatSectionTitle(format(day, 'EEEE', { locale }))}
                         </Text>
-                        <Text style={[styles.dayHeaderSubText, { color: theme.textSecondary }]}>
+                        <Text style={[styles.dayHeaderSubText, { color: theme.weekdayName }]}>
                           ({format(day, 'd.MM')})
                         </Text>
                       </View>
@@ -1032,7 +1080,13 @@ function HomeScreen() {
                           {formatSectionTitle(t.medications)}
                         </Text>
                         <Pressable
-                          onPress={() => wellnessStore.addMedicationRow(dateKey)}
+                          onPress={() => {
+                            setStatusTarget(null);
+                            setCatalogScheduleTarget(null);
+                            setScheduleRowTarget(null);
+                            setScheduleDraft({ dateKey });
+                            setShowMedicationSchedule(true);
+                          }}
                           accessibilityLabel={t.addMedication}
                           style={({ pressed }) => [
                             styles.smallCircleButton,
@@ -1050,11 +1104,6 @@ function HomeScreen() {
                           style={({ pressed }) => [pressed && styles.pressed]}>
                           <Ionicons name="help-circle-outline" size={13} color={ui.iconMuted} />
                         </Pressable>
-                        <Text style={styles.medicationsHeaderStatusText}>
-                          {filledMeds.length > 0
-                            ? `${takenMedsCount}/${filledMeds.length}`
-                            : t.status.toLocaleLowerCase()}
-                        </Text>
                       </View>
                     </View>
                     {medRows.map(({ row, originalIndex, displayTime }, displayIndex) => {
@@ -1064,8 +1113,8 @@ function HomeScreen() {
                         : row.skipped
                           ? { color: theme.textSecondary, opacity: 0.8, textDecorationLine: 'line-through' as const }
                           : isReviewMode && isPastDay
-                            ? { color: theme.text, opacity: 0.35, textDecorationLine: 'line-through' as const }
-                            : { color: theme.text, opacity: 1, textDecorationLine: 'none' as const };
+                            ? { color: ui.medicationFieldText, opacity: 0.35, textDecorationLine: 'line-through' as const }
+                            : { color: ui.medicationFieldText, opacity: 1, textDecorationLine: 'none' as const };
                       const hasReminder = !!displayTime?.trim() && !!row.medication.trim();
                       const canDeleteRow =
                         storedMeds.length > DEFAULT_MEDICATION_ROWS &&
@@ -1074,9 +1123,34 @@ function HomeScreen() {
                       const scheduledIntakeNumber = row.taken
                         ? wellnessStore.getMedicationScheduledIntakeNumber(dateKey, row, originalIndex)
                         : null;
-                      const hasTakenMeta = row.taken && (row.takenAt || scheduledIntakeNumber !== null);
-                      const showMedicationRowMeta = canDeleteRow || hasTakenMeta;
+                      const packageSize = row.medication.trim()
+                        ? wellnessStore.getMedicationPackageSizeForName(row.medication)
+                        : undefined;
+                      const packProgressLabel =
+                        scheduledIntakeNumber !== null && packageSize
+                          ? t.medicationStockPackProgress
+                              .replace('{n}', String(scheduledIntakeNumber))
+                              .replace('{size}', String(packageSize))
+                          : scheduledIntakeNumber !== null
+                            ? String(scheduledIntakeNumber)
+                            : null;
+                      const hasTakenMeta = row.taken && (row.takenAt || packProgressLabel !== null);
                       const medicationParts = parseMedicationLabel(row.medication);
+                      const catalogEntry = row.medication.trim()
+                        ? medicationCatalog.find(
+                            (entry) =>
+                              formatMedicationLabel(entry.name, entry.dose).trim().toLowerCase() ===
+                              row.medication.trim().toLowerCase(),
+                          )
+                        : undefined;
+                      const stockLeft =
+                        catalogEntry &&
+                        catalogEntry.refillReminderEnabled !== false &&
+                        typeof catalogEntry.stockCount === 'number' &&
+                        typeof catalogEntry.refillReminderCount === 'number' &&
+                        catalogEntry.stockCount <= catalogEntry.refillReminderCount
+                          ? catalogEntry.stockCount
+                          : undefined;
                       const updateMedicationParts = (updates: Partial<{ name: string; dose: string }>) => {
                         wellnessStore.updateMedication(
                           dateKey,
@@ -1131,11 +1205,7 @@ function HomeScreen() {
                                   textAlign="left"
                                   textAlignVertical="top"
                                   onSubmitEditing={() => {
-                                    const isLast = displayIndex === medRows.length - 1;
-                                    if (isLast) {
-                                      wellnessStore.addMedicationRow(dateKey);
-                                      setTimeout(() => focusMedInput(dateKey, displayIndex + 1), 50);
-                                    } else {
+                                    if (displayIndex < medRows.length - 1) {
                                       focusMedInput(dateKey, displayIndex + 1);
                                     }
                                   }}
@@ -1162,11 +1232,7 @@ function HomeScreen() {
                                   textAlign="left"
                                   textAlignVertical="top"
                                   onSubmitEditing={() => {
-                                    const isLast = displayIndex === medRows.length - 1;
-                                    if (isLast) {
-                                      wellnessStore.addMedicationRow(dateKey);
-                                      setTimeout(() => focusMedInput(dateKey, displayIndex + 1), 50);
-                                    } else {
+                                    if (displayIndex < medRows.length - 1) {
                                       focusMedInput(dateKey, displayIndex + 1);
                                     }
                                   }}
@@ -1180,23 +1246,6 @@ function HomeScreen() {
                                   ]}
                                 />
                               </View>
-                            </View>
-                            <View style={styles.colReminderCell}>
-                              <Pressable
-                                onPress={() => wellnessStore.toggleMedicationReminder(dateKey, row.id, originalIndex)}
-                                disabled={!hasReminder}
-                                style={({ pressed }) => [
-                                  styles.reminderButton,
-                                  pressed && styles.pressed,
-                                  row.reminderEnabled && hasReminder ? { backgroundColor: ui.reminderOnBg } : null,
-                                  !hasReminder ? { opacity: 0.25 } : null,
-                                ]}>
-                                <Ionicons
-                                  name={row.reminderEnabled ? 'notifications' : 'notifications-off-outline'}
-                                  size={13}
-                                  color={ui.icon}
-                                />
-                              </Pressable>
                             </View>
                             <View style={styles.colCheckCell}>
                               <Pressable
@@ -1214,41 +1263,78 @@ function HomeScreen() {
                                       : t.medicationTake
                                 }
                                 style={({ pressed }) => [
-                                  styles.takeButton,
-                                  row.taken
-                                    ? { backgroundColor: ui.activeBg, borderColor: ui.activeBg }
-                                    : row.skipped
-                                      ? { backgroundColor: ui.checkOffBg, borderColor: '#ef4444' }
-                                      : {
-                                          backgroundColor: row.medication.trim() ? ui.activeBg : ui.checkOffBg,
-                                          borderColor: row.medication.trim() ? ui.activeBg : ui.checkOffBorder,
-                                          opacity: row.medication.trim() ? 1 : 0.35,
-                                        },
+                                  row.taken || row.skipped ? styles.markCheckbox : styles.takeButton,
+                                  row.taken || row.skipped
+                                    ? {
+                                        backgroundColor: ui.inactiveBg,
+                                        borderColor: row.taken ? ui.activeBg : '#ef4444',
+                                      }
+                                    : {
+                                        backgroundColor: ui.sectionLabelBg,
+                                        borderColor: ui.rowBorder,
+                                        opacity: row.medication.trim() ? 1 : 0.35,
+                                      },
                                   pressed && styles.pressed,
                                 ]}>
-                                <Text
-                                  style={[
-                                    styles.takeButtonText,
-                                    {
-                                      color: row.taken || (!row.skipped && row.medication.trim())
-                                        ? ui.activeText
-                                        : row.skipped
-                                          ? '#ef4444'
-                                          : theme.textSecondary,
-                                    },
-                                  ]}
-                                  numberOfLines={1}>
-                                  {row.taken
-                                    ? t.medicationTaken
-                                    : row.skipped
-                                      ? t.medicationSkipped
-                                      : t.medicationTake}
-                                </Text>
+                                {row.taken ? (
+                                  <Ionicons name="checkmark" size={18} color={ui.activeBg} />
+                                ) : row.skipped ? (
+                                  <Ionicons name="close" size={18} color="#ef4444" />
+                                ) : (
+                                  <Text
+                                    style={[styles.takeButtonText, { color: theme.textSecondary }]}
+                                    numberOfLines={1}>
+                                    {t.medicationTake}
+                                  </Text>
+                                )}
                               </Pressable>
                             </View>
                           </View>
-                          {showMedicationRowMeta ? (
-                            <View style={styles.medicationRowMeta}>
+                          <View style={styles.medicationRowMeta}>
+                            <View style={styles.colReminderUnderTime}>
+                              <Pressable
+                                onPress={() => wellnessStore.toggleMedicationReminder(dateKey, row.id, originalIndex)}
+                                disabled={!hasReminder}
+                                style={({ pressed }) => [
+                                  styles.reminderButton,
+                                  pressed && styles.pressed,
+                                  !hasReminder ? { opacity: 0.25 } : null,
+                                ]}>
+                                {row.reminderEnabled ? (
+                                  <BellOnIcon size={24} color={ui.icon} />
+                                ) : (
+                                  <BellOffIcon size={24} color={ui.icon} />
+                                )}
+                              </Pressable>
+                              <Pressable
+                                onPress={() => {
+                                  if (!row.medication.trim()) return;
+                                  setStatusTarget(null);
+                                  setCatalogScheduleTarget(null);
+                                  setScheduleDraft(null);
+                                  setScheduleRowTarget({ dateKey, rowId: row.id, idx: originalIndex });
+                                  setShowMedicationSchedule(true);
+                                }}
+                                disabled={!row.medication.trim()}
+                                accessibilityLabel={t.medicationScheduleButton}
+                                style={({ pressed }) => [
+                                  styles.reminderButton,
+                                  pressed && styles.pressed,
+                                  !row.medication.trim() ? { opacity: 0.25 } : null,
+                                ]}>
+                                <ScheduleIcon size={24} color={ui.icon} />
+                              </Pressable>
+                            </View>
+                            <View style={styles.medicationRowMetaRest}>
+                              {stockLeft !== undefined ? (
+                                <Text
+                                  style={[styles.medicationStockLeftText, { color: theme.textSecondary }]}
+                                  numberOfLines={1}>
+                                  {t.medicationStockPillsLeft.replace('{n}', String(stockLeft))}
+                                </Text>
+                              ) : (
+                                <View style={styles.medicationRowMetaSpacer} />
+                              )}
                               {hasTakenMeta ? (
                                 <View style={styles.takenMetaWrap}>
                                   {row.takenAt ? (
@@ -1259,15 +1345,11 @@ function HomeScreen() {
                                       {row.takenAt}
                                     </Text>
                                   ) : null}
-                                  {scheduledIntakeNumber !== null ? (
+                                  {packProgressLabel !== null ? (
                                     <View style={styles.takenIntakeNumberWrap}>
-                                      <Image
-                                        source={require('@/assets/images/medication-intake-pill.png')}
-                                        style={styles.takenIntakePillIcon}
-                                        contentFit="contain"
-                                      />
+                                      <PillIcon size={16} color={theme.textSecondary} />
                                       <Text style={[styles.takenIntakeNumberText, { color: theme.textSecondary }]}>
-                                        {scheduledIntakeNumber}
+                                        {packProgressLabel}
                                       </Text>
                                     </View>
                                   ) : null}
@@ -1285,7 +1367,7 @@ function HomeScreen() {
                                 </Pressable>
                               ) : null}
                             </View>
-                          ) : null}
+                          </View>
                         </View>
                       );
                     })}
@@ -1301,7 +1383,7 @@ function HomeScreen() {
                       />
                     ) : null}
 
-                    {renderDayNotesGroup(dateKey, storedDay, reviewBg)}
+                    {renderDayNotesGroup(dateKey, storedDay, dayWeekBg)}
 
                     {dayCelebrationMessage ? (
                       <DayCelebrationBanner
@@ -1427,7 +1509,7 @@ function HomeScreen() {
                     { backgroundColor: ui.circleBg, borderColor: ui.circleBorder, shadowOpacity: ui.circleShadow },
                     pressed && styles.pressed,
                   ]}>
-                  <Ionicons name="medkit-outline" size={18} color={ui.icon} />
+                  <MedicationsIcon size={16} color={ui.icon} />
                   <Text style={[styles.footerIconLabel, styles.footerIconLabelCompact, { color: theme.text }]}>
                     {t.allMedicationsButton}
                   </Text>
@@ -1443,7 +1525,7 @@ function HomeScreen() {
                     { backgroundColor: ui.circleBg, borderColor: ui.circleBorder, shadowOpacity: ui.circleShadow },
                     pressed && styles.pressed,
                   ]}>
-                  <Ionicons name="information-circle-outline" size={18} color={ui.icon} />
+                  <Ionicons name="information-circle-outline" size={16} color={ui.icon} />
                 </Pressable>
                 <Pressable
                   onPress={openSettings}
@@ -1454,7 +1536,7 @@ function HomeScreen() {
                     { backgroundColor: ui.circleBg, borderColor: ui.circleBorder, shadowOpacity: ui.circleShadow },
                     pressed && styles.pressed,
                   ]}>
-                  <Ionicons name="settings-outline" size={18} color={ui.icon} />
+                  <Ionicons name="settings-outline" size={16} color={ui.icon} />
                 </Pressable>
               </View>
               <Pressable
@@ -1468,7 +1550,7 @@ function HomeScreen() {
                   { backgroundColor: ui.activeBg, borderColor: ui.activeBg, shadowOpacity: ui.circleShadow },
                   pressed && styles.pressed,
                 ]}>
-                <Ionicons name="pulse" size={24} color={ui.activeText} />
+                <Ionicons name="pulse" size={20} color={ui.activeText} />
               </Pressable>
             </View>
             </View>
@@ -1641,11 +1723,30 @@ function HomeScreen() {
               <AllMedicationsModal
                 visible
                 labels={t}
-                onClose={() => setShowAllMedications(false)}
+                initialStockCatalogId={pendingStockSetupCatalogId}
+                onInitialStockHandled={() => setPendingStockSetupCatalogId(null)}
+                onClose={() => {
+                  setPendingStockSetupCatalogId(null);
+                  setShowAllMedications(false);
+                }}
+                onAddMedication={() => {
+                  const todayKey = format(new Date(), 'yyyy-MM-dd');
+                  setStatusTarget(null);
+                  setCatalogScheduleTarget(null);
+                  setScheduleRowTarget(null);
+                  setPendingStockSetupCatalogId(null);
+                  setScheduleDraft({ dateKey: todayKey, returnToAllMedications: true });
+                  setShowAllMedications(false);
+                  setShowMedicationSchedule(true);
+                }}
                 onOpenSchedule={(entry) => {
                   const medication = catalogEntryMedicationLabel(entry);
                   if (!medication.trim()) return;
-                  setCatalogScheduleTarget({ medication, time: '' });
+                  setScheduleDraft(null);
+                  setScheduleRowTarget(null);
+                  setStatusTarget(null);
+                  setPendingStockSetupCatalogId(null);
+                  setCatalogScheduleTarget({ catalogId: entry.id, medication, time: '' });
                   setShowAllMedications(false);
                   setShowMedicationSchedule(true);
                 }}
@@ -1660,7 +1761,6 @@ function HomeScreen() {
                   setStatusTarget(null);
                   setShowMedicationSchedule(false);
                 }}
-                onOpenSchedule={() => setShowMedicationSchedule(true)}
                 onSelectTaken={() => {
                   wellnessStore.setMedicationStatus(statusTarget.dateKey, statusTarget.rowId, statusTarget.idx, 'taken');
                   setStatusTarget(null);
@@ -1681,27 +1781,114 @@ function HomeScreen() {
 
             {showMedicationSchedule && scheduleContext ? (
               <MedicationScheduleModal
+                key={
+                  scheduleContext.mode === 'create'
+                    ? `create-${scheduleContext.draftDateKey}`
+                    : `edit-${scheduleContext.scheduleIdentity}`
+                }
                 visible
                 labels={t}
+                mode={scheduleContext.mode}
                 medication={scheduleContext.row.medication}
                 times={scheduleContext.times}
                 intakeDaysSummary={scheduleContext.intakeDaysSummary}
                 repeat={scheduleContext.repeat}
+                reminderEnabled={scheduleContext.reminderEnabled}
                 weekdayLabels={weekDays.map((dayItem) => format(dayItem, 'EEE', { locale }).toUpperCase())}
                 durationStartKey={scheduleContext.durationStartKey}
                 locale={locale}
                 onClose={() => {
+                  const returnToAllMedications =
+                    catalogScheduleTarget !== null || Boolean(scheduleDraft?.returnToAllMedications);
                   setShowMedicationSchedule(false);
                   setCatalogScheduleTarget(null);
+                  setScheduleDraft(null);
+                  setScheduleRowTarget(null);
+                  if (returnToAllMedications) {
+                    setShowAllMedications(true);
+                  }
+                }}
+                onCreate={(payload) => {
+                  const cleanedTimes = payload.times.map((time) => time.trim()).filter(Boolean);
+                  if (!payload.medication.trim() || cleanedTimes.length === 0) return;
+                  const weekKey = scheduleContext.weekKey;
+                  const repeat = {
+                    ...payload.repeat,
+                    startDateKey: payload.startDateKey,
+                    endDateKey: payload.endDateKey,
+                  };
+                  wellnessStore.setMedicationIntakeTimes(
+                    weekKey,
+                    payload.medication,
+                    cleanedTimes,
+                    repeat,
+                    payload.reminderEnabled,
+                  );
+                  wellnessStore.setMedicationDuration(
+                    weekKey,
+                    { medication: payload.medication, time: cleanedTimes[0] },
+                    {
+                      startDateKey: payload.startDateKey,
+                      endDateKey: payload.endDateKey,
+                    },
+                  );
+                  const returnToAllMedications =
+                    catalogScheduleTarget !== null || Boolean(scheduleDraft?.returnToAllMedications);
+                  let stockSetupCatalogId: string | null = null;
+                  if (returnToAllMedications && scheduleDraft?.returnToAllMedications) {
+                    wellnessStore.refreshMedicationCatalog();
+                    stockSetupCatalogId =
+                      wellnessStore.getMedicationCatalogEntryByLabel(payload.medication)?.id ?? null;
+                  }
+                  setShowMedicationSchedule(false);
+                  setScheduleDraft(null);
+                  setCatalogScheduleTarget(null);
+                  setScheduleRowTarget(null);
+                  setStatusTarget(null);
+                  setPendingStockSetupCatalogId(stockSetupCatalogId);
+                  if (returnToAllMedications) {
+                    setShowAllMedications(true);
+                  }
                 }}
                 onDelete={() => {
                   wellnessStore.deleteMedicationSchedule(
                     scheduleContext.weekKey,
                     scheduleContext.row.medication,
                   );
+                  const returnToAllMedications =
+                    catalogScheduleTarget !== null || Boolean(scheduleDraft?.returnToAllMedications);
                   setShowMedicationSchedule(false);
                   setCatalogScheduleTarget(null);
+                  setScheduleDraft(null);
+                  setScheduleRowTarget(null);
                   setStatusTarget(null);
+                  if (returnToAllMedications) {
+                    setShowAllMedications(true);
+                  }
+                }}
+                onUpdateMedication={(medication) => {
+                  const parts = parseMedicationLabel(medication);
+                  if (scheduleRowTarget) {
+                    wellnessStore.updateMedication(
+                      scheduleRowTarget.dateKey,
+                      scheduleRowTarget.rowId,
+                      { medication },
+                      scheduleRowTarget.idx,
+                    );
+                    return;
+                  }
+                  if (catalogScheduleTarget) {
+                    wellnessStore.updateMedicationCatalogEntry(catalogScheduleTarget.catalogId, {
+                      name: parts.name,
+                      dose: parts.dose,
+                    });
+                    setCatalogScheduleTarget((current) =>
+                      current ? { ...current, medication } : current,
+                    );
+                  }
+                }}
+                onUpdateReminder={(enabled) => {
+                  wellnessStore.setMedicationReminderEnabled(scheduleContext.row.medication, enabled);
                 }}
                 onUpdateRepeat={(repeat) => {
                   wellnessStore.setMedicationIntakeRepeat(scheduleContext.weekKey, scheduleContext.row, repeat);
@@ -1715,6 +1902,7 @@ function HomeScreen() {
                     scheduleContext.row.medication,
                     times,
                     scheduleContext.repeat,
+                    scheduleContext.reminderEnabled,
                   );
                 }}
               />
@@ -1779,24 +1967,28 @@ const styles = StyleSheet.create({
     android: { elevation: 0 },
     default: { elevation: 2 },
   }),
-  header: { paddingTop: 24, paddingBottom: 12, paddingHorizontal: 24 },
+  header: { paddingTop: 12, paddingBottom: 8, paddingHorizontal: 24 },
   stickyHeader: {
     zIndex: 2,
     borderBottomWidth: 1,
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
     shadowRadius: 4,
     elevation: 3,
   },
+  stickyHeaderBg: {
+    ...StyleSheet.absoluteFill,
+  },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   monthPickerButton: { flex: 1, alignItems: 'center', paddingHorizontal: 8 },
-  monthTitle: { ...weekMonthTitleStyle, textAlign: 'center' },
-  monthTitleCompact: { fontSize: 22 },
-  monthYear: { ...weekYearStyle, marginTop: 4, textAlign: 'center' },
+  monthTitle: { ...weekMonthTitleStyle, fontSize: 24, textAlign: 'center' },
+  monthTitleCompact: { fontSize: 20 },
+  monthYear: { ...weekYearStyle, fontSize: 12, marginTop: 2, textAlign: 'center' },
   circleButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1805,21 +1997,21 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
     elevation: 3,
   },
-  circleButtonSpacer: { width: 40, height: 40 },
+  circleButtonSpacer: { width: 36, height: 36 },
   mainTabs: {
     flexDirection: 'row',
     gap: 8,
-    marginTop: 14,
+    marginTop: 8,
   },
   mainTabBtn: {
     flex: 1,
-    minHeight: 36,
-    borderRadius: 18,
+    minHeight: 32,
+    borderRadius: 8,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 8,
-    paddingVertical: 8,
+    paddingVertical: 6,
   },
   mainTabLabel: {
     ...weekServiceTextStyle,
@@ -1907,9 +2099,6 @@ const styles = StyleSheet.create({
   medicationsHeaderText: {
     ...dayMedicationsHeaderStyle,
   },
-  medicationsHeaderStatusText: {
-    ...dayMedicationsStatusStyle,
-  },
   medicationsHeaderStatus: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1921,16 +2110,40 @@ const styles = StyleSheet.create({
     minHeight: 24,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'flex-end',
-    paddingLeft: 8,
+    paddingLeft: 5,
     paddingRight: 12,
     paddingBottom: 8,
+  },
+  colReminderUnderTime: {
+    width: 64,
+    flexShrink: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    gap: 4,
+  },
+  medicationRowMetaRest: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 8,
+  },
+  medicationRowMetaSpacer: {
+    flex: 1,
+  },
+  medicationStockLeftText: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 11,
+    fontFamily: Fonts.sansMedium,
+    lineHeight: 14,
   },
   deleteBtn: {
     width: 20,
     height: 20,
     borderRadius: 12,
-  
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1949,6 +2162,7 @@ const styles = StyleSheet.create({
   timeText: {
     ...weekServiceTextStyle,
     fontFamily: Fonts.mono,
+    fontWeight: '700',
     letterSpacing: 0,
   },
   colMedCell: {
@@ -1971,6 +2185,8 @@ const styles = StyleSheet.create({
   },
   medicationNameInput: {
     ...weekBodyTextStyle,
+    fontFamily: Fonts.sansSemiBold,
+    fontWeight: '600',
     flex: 1,
     minWidth: 0,
     lineHeight: 20,
@@ -1980,6 +2196,8 @@ const styles = StyleSheet.create({
   },
   medicationDoseInput: {
     ...weekBodyTextStyle,
+    fontFamily: Fonts.sansSemiBold,
+    fontWeight: '600',
     width: 72,
     maxWidth: 72,
     flexShrink: 0,
@@ -1987,14 +2205,6 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
     paddingHorizontal: 0,
     textAlign: 'left',
-  },
-  colReminderCell: {
-    width: 28,
-    flexShrink: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    paddingRight: 10,
   },
   colCheckCell: {
     width: 78,
@@ -2022,10 +2232,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 2,
   },
-  takenIntakePillIcon: {
-    width: 12,
-    height: 12,
-  },
   takenIntakeNumberText: {
     fontSize: 12,
     fontFamily: Fonts.mono,
@@ -2035,7 +2241,7 @@ const styles = StyleSheet.create({
   },
   reminderButton: {
     width: 28,
-    height: 22,
+    height: 24,
     borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
@@ -2050,6 +2256,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 6,
     paddingVertical: 4,
+  },
+  markCheckbox: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   takeButtonText: {
     fontSize: 11,
@@ -2168,7 +2382,7 @@ const styles = StyleSheet.create({
   },
   footer: {
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 6,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'stretch',
@@ -2181,14 +2395,14 @@ const styles = StyleSheet.create({
       default: { elevation: 3 },
     }),
   },
-  footerActions: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 },
+  footerActions: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 0 },
   panicButton: {
-    width: 44,
-    height: 44,
+    width: 36,
+    height: 36,
     flexShrink: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 22,
+    borderRadius: 18,
     borderWidth: 1,
     shadowColor: '#000',
     shadowRadius: 4,
@@ -2200,18 +2414,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
-    minHeight: 36,
-    paddingHorizontal: 10,
-    borderRadius: 18,
+    minHeight: 32,
+    paddingHorizontal: 8,
+    borderRadius: 16,
     borderWidth: 1,
     shadowColor: '#000',
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
   },
-  footerIconButtonIconOnly: { width: 36, paddingHorizontal: 0 },
+  footerIconButtonIconOnly: { width: 32, paddingHorizontal: 0 },
   footerIconLabel: { ...weekServiceTextStyle },
-  footerIconLabelCompact: { fontSize: 10, letterSpacing: 0.3, maxWidth: 72, textAlign: 'center' },
+  footerIconLabelCompact: { fontSize: 9, letterSpacing: 0.3, maxWidth: 72, textAlign: 'center' },
   modalOverlayFullScreen: {
     position: 'absolute',
     top: 0,

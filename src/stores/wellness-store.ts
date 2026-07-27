@@ -16,7 +16,7 @@ import { normalizeDayLogPanicAttack } from '@/utils/panic-attack-log';
 
 const STORAGE_KEY = 'stop-ad-v1';
 const NATIVE_FILE = `${STORAGE_KEY}.json`;
-export const DEFAULT_MEDICATION_ROWS = 1;
+export const DEFAULT_MEDICATION_ROWS = 0;
 export const MEDICATION_REPEAT_MONTH_OPTIONS = [1, 2, 3, 6, 12] as const;
 
 export type MedicationRepeatConfig = {
@@ -41,6 +41,19 @@ export type MedicationCatalogEntry = {
   id: string;
   name: string;
   dose: string;
+  /** Current pill count in stock. */
+  stockCount?: number;
+  /** Remind to refill when stock reaches this many pills. */
+  refillReminderCount?: number;
+  /** Whether refill-low reminder is enabled. */
+  refillReminderEnabled?: boolean;
+  /** Number of pills in one package. */
+  packageSize?: number;
+  /**
+   * Bumped when package size is manually changed.
+   * Kept for compatibility; pack progress no longer resets on stock refill.
+   */
+  stockCycleVersion?: number;
   /** Manually added via catalog; shown until schedule is saved or entry is removed. */
   isDraft?: boolean;
 };
@@ -78,6 +91,10 @@ export type MedicationRow = {
   skipped?: boolean;
   takenAt?: string;
   reminderEnabled: boolean;
+  /** Stock/package cycle this take belongs to (for pack numbering). */
+  stockCycleVersion?: number;
+  /** True when this take successfully decremented catalog stockCount. */
+  stockDeducted?: boolean;
 };
 
 export type DayLog = {
@@ -237,8 +254,12 @@ function generateSafeId(dateKey: string, baseIndex: number, existing: Medication
   return newId;
 }
 
+function hasMedicationRowContent(row: Pick<MedicationRow, 'time' | 'medication' | 'taken' | 'skipped'>): boolean {
+  return Boolean(row.medication.trim() || (row.time ?? '').trim() || row.taken || row.skipped);
+}
+
 function ensureMinimumMedicationRows(dateKey: string, meds: MedicationRow[]): MedicationRow[] {
-  if (meds.length >= DEFAULT_MEDICATION_ROWS) return meds;
+  if (DEFAULT_MEDICATION_ROWS <= 0 || meds.length >= DEFAULT_MEDICATION_ROWS) return meds;
   const padded = [...meds];
   while (padded.length < DEFAULT_MEDICATION_ROWS) {
     padded.push({
@@ -253,6 +274,7 @@ function ensureMinimumMedicationRows(dateKey: string, meds: MedicationRow[]): Me
 }
 
 function defaultMedicationRows(dateKey: string, count = DEFAULT_MEDICATION_ROWS): MedicationRow[] {
+  if (count <= 0) return [];
   return Array.from({ length: count }).map((_, idx) => ({
     id: generateSafeId(dateKey, idx, []),
     time: '',
@@ -364,16 +386,16 @@ class WellnessStore {
   getDay(dateKey: string): DayLog {
     const existing = this.days[dateKey];
     if (existing) return existing;
-    return { ...emptyDayLog(), medications: defaultMedicationRows(dateKey) };
+    return { ...emptyDayLog(), medications: [] };
   }
 
   private ensureDay(dateKey: string): DayLog {
     if (!this.days[dateKey]) {
-      this.days[dateKey] = { ...emptyDayLog(), medications: defaultMedicationRows(dateKey) };
+      this.days[dateKey] = { ...emptyDayLog(), medications: [] };
     }
     const day = this.days[dateKey];
-    if (day.medications.length === 0) {
-      day.medications = defaultMedicationRows(dateKey);
+    if (!Array.isArray(day.medications)) {
+      day.medications = [];
     }
     return day;
   }
@@ -408,6 +430,11 @@ class WellnessStore {
             normalizeDayLogPanicAttack(day as Record<string, unknown>);
             if (day.growthRings) {
               day.growthRings = normalizeGrowthRingsLog(day.growthRings);
+            }
+            if (Array.isArray(day.medications)) {
+              day.medications = day.medications.filter((row) => hasMedicationRowContent(row));
+            } else {
+              day.medications = [];
             }
           }
           this.days = days;
@@ -532,64 +559,61 @@ class WellnessStore {
     return rowTime || scheduleTime;
   }
 
-  getMedicationScheduledIntakeNumber(dateKey: string, row: MedicationRow, rowIndex: number): number | null {
+  getMedicationScheduledIntakeNumber(dateKey: string, row: MedicationRow, _rowIndex: number): number | null {
+    const medName = row.medication.trim();
+    if (!medName || !row.taken) return null;
+
+    const packageSize = this.getMedicationPackageSize(medName);
+    if (!packageSize) return null;
+
+    // Count actual taken pills for this medication (refill must not reset n/size).
+    return this.getMedicationPackageCycleIntakeNumber(dateKey, row, packageSize);
+  }
+
+  getMedicationPackageSizeForName(medicationName: string): number | undefined {
+    return this.getMedicationPackageSize(medicationName);
+  }
+
+  getMedicationCatalogEntryByLabel(medicationName: string): MedicationCatalogEntry | undefined {
+    const entry = this.findMedicationCatalogEntry(medicationName);
+    return entry ? { ...entry } : undefined;
+  }
+
+  private findMedicationCatalogEntry(medicationName: string): MedicationCatalogEntry | undefined {
+    return this.medicationCatalog.find((item) =>
+      medicationLabelsEqual(formatMedicationLabel(item.name, item.dose), medicationName),
+    );
+  }
+
+  private getMedicationPackageSize(medicationName: string): number | undefined {
+    const size = this.findMedicationCatalogEntry(medicationName)?.packageSize;
+    return typeof size === 'number' && size > 0 ? size : undefined;
+  }
+
+  private getMedicationPackageCycleIntakeNumber(
+    dateKey: string,
+    row: MedicationRow,
+    packageSize: number,
+  ): number | null {
     const medName = row.medication.trim();
     if (!medName) return null;
 
-    const weekKey = format(
-      startOfWeek(parse(dateKey, 'yyyy-MM-dd', new Date()), { weekStartsOn: WEEK_STARTS_ON }),
-      'yyyy-MM-dd',
-    );
-    const schedule = this.getMedicationScheduleForName(medName, weekKey);
-    const repeat = normalizeMedicationRepeat(schedule.repeat);
-    if (!repeat.startDateKey) return null;
-
-    const rowTime = this.resolveMedicationRowTime(dateKey, row, rowIndex).trim();
-    const times =
-      schedule.times.length > 0
-        ? schedule.times
-        : rowTime
-          ? [rowTime]
-          : [];
-    if (times.length === 0) return null;
-
-    const day = this.getDay(dateKey);
-    const slotIndex = this.getMedicationTimeSlotIndex(day.medications, row.id, medName, rowIndex);
-    if (slotIndex >= times.length) return null;
-
-    const targetDate = startOfDay(parse(dateKey, 'yyyy-MM-dd', new Date()));
-    const anchor = startOfDay(getMedicationDurationStart(repeat, schedule.planWeekKey));
-
-    if (targetDate < anchor) return null;
-    if (!isWithinMedicationDuration(targetDate, repeat, schedule.planWeekKey)) return null;
-    if (!medicationRepeatMatchesDay(targetDate, anchor, repeat)) return null;
-
-    let count = 0;
-    let current = anchor;
     const targetName = medName.toLowerCase();
+    let count = 0;
 
-    while (current <= targetDate) {
-      if (
-        isWithinMedicationDuration(current, repeat, schedule.planWeekKey) &&
-        medicationRepeatMatchesDay(current, anchor, repeat)
-      ) {
-        const currentKey = format(current, 'yyyy-MM-dd');
-        const currentDay = this.getDay(currentKey);
-        const matchingRows = currentDay.medications.filter(
-          (medicationRow) => medicationRow.medication.trim().toLowerCase() === targetName,
-        );
+    for (const currentKey of Object.keys(this.days).sort()) {
+      const currentDay = this.days[currentKey];
+      if (!currentDay) continue;
 
-        for (let slot = 0; slot < times.length; slot++) {
-          const scheduledRow = matchingRows[slot];
-          if (scheduledRow?.taken) {
-            count += 1;
-          }
-          if (currentKey === dateKey && slot === slotIndex) {
-            return scheduledRow?.taken ? count : null;
-          }
+      for (const medicationRow of currentDay.medications) {
+        if (!medicationRow.taken) continue;
+        if (medicationRow.medication.trim().toLowerCase() !== targetName) continue;
+
+        count += 1;
+        if (currentKey === dateKey && medicationRow.id === row.id) {
+          return ((count - 1) % packageSize) + 1;
         }
       }
-      current = addDays(current, 1);
     }
 
     return null;
@@ -641,6 +665,7 @@ class WellnessStore {
     repeat: MedicationRepeatConfig;
     times: string[];
     planWeekKey: string;
+    reminderEnabled: boolean;
   } {
     const trimmedName = medicationName.trim();
     const fallback =
@@ -651,12 +676,15 @@ class WellnessStore {
         repeat: { ...DEFAULT_MEDICATION_REPEAT, daysOfWeek: [...DEFAULT_MEDICATION_REPEAT.daysOfWeek] },
         times: [],
         planWeekKey: fallback,
+        reminderEnabled: true,
       };
     }
 
     const target = trimmedName.toLowerCase();
     let bestRepeat: MedicationRepeatConfig | null = null;
     let bestScore = -1;
+    let reminderEnabled = true;
+    let sawReminder = false;
     const times = new Set<string>();
 
     for (const plan of Object.values(this.weekMedicationPlans)) {
@@ -664,6 +692,10 @@ class WellnessStore {
         if (template.medication.trim().toLowerCase() !== target) continue;
         const time = (template.time ?? '').trim();
         if (time) times.add(time);
+        if (!sawReminder) {
+          reminderEnabled = template.reminderEnabled !== false;
+          sawReminder = true;
+        }
         const repeat = normalizeMedicationRepeat(template.repeat);
         const score = scoreMedicationRepeat(repeat);
         if (score > bestScore) {
@@ -683,6 +715,7 @@ class WellnessStore {
       repeat,
       times: [...times],
       planWeekKey,
+      reminderEnabled,
     };
   }
 
@@ -911,13 +944,32 @@ class WellnessStore {
     this.schedulePersist();
   }
 
-  updateMedicationCatalogEntry(id: string, patch: Partial<Pick<MedicationCatalogEntry, 'name' | 'dose'>>) {
+  updateMedicationCatalogEntry(
+    id: string,
+    patch: Partial<
+      Pick<
+        MedicationCatalogEntry,
+        'name' | 'dose' | 'stockCount' | 'refillReminderCount' | 'refillReminderEnabled' | 'packageSize'
+      >
+    >,
+  ) {
     const index = this.medicationCatalog.findIndex((entry) => entry.id === id);
     if (index < 0) return;
 
     const current = this.medicationCatalog[index];
     const oldLabel = formatMedicationLabel(current.name, current.dose);
-    const next = { ...current, ...patch };
+    const cleanedPatch = Object.fromEntries(
+      Object.entries(patch).filter(([, value]) => value !== undefined),
+    ) as typeof patch;
+    const shouldRestartPackageCycle =
+      cleanedPatch.packageSize !== undefined && cleanedPatch.packageSize !== current.packageSize;
+    const next = {
+      ...current,
+      ...cleanedPatch,
+      ...(shouldRestartPackageCycle
+        ? { stockCycleVersion: (current.stockCycleVersion ?? 0) + 1 }
+        : {}),
+    };
     const newLabel = formatMedicationLabel(next.name, next.dose);
 
     this.medicationCatalog = this.medicationCatalog.map((entry) =>
@@ -1121,6 +1173,28 @@ class WellnessStore {
     }
   }
 
+  private adjustMedicationStock(medicationLabel: string, delta: number): boolean {
+    const trimmed = medicationLabel.trim();
+    if (!trimmed || delta === 0) return false;
+
+    const index = this.medicationCatalog.findIndex((entry) =>
+      medicationLabelsEqual(formatMedicationLabel(entry.name, entry.dose), trimmed),
+    );
+    if (index < 0) return false;
+
+    const entry = this.medicationCatalog[index];
+    if (typeof entry.stockCount !== 'number') return false;
+    if (delta < 0 && entry.stockCount <= 0) return false;
+
+    const nextCount = Math.max(0, entry.stockCount + delta);
+    if (nextCount === entry.stockCount) return false;
+
+    this.medicationCatalog = this.medicationCatalog.map((item, itemIndex) =>
+      itemIndex === index ? { ...item, stockCount: nextCount } : item,
+    );
+    return true;
+  }
+
   setMedicationStatus(dateKey: string, rowId: string, idx: number, status: 'taken' | 'skipped' | 'cleared') {
     const day = this.ensureDay(dateKey);
     const meds = [...day.medications];
@@ -1147,11 +1221,30 @@ class WellnessStore {
         reminderEnabled: true,
       };
     } else {
+      const previous = meds[rowIndex];
+      const wasTaken = previous.taken;
+      const nextTaken = status === 'taken';
+      const catalogEntry = nextTaken
+        ? this.findMedicationCatalogEntry(previous.medication)
+        : undefined;
+
+      let stockDeducted = previous.stockDeducted;
+      if (!wasTaken && nextTaken) {
+        stockDeducted = this.adjustMedicationStock(previous.medication, -1) ? true : undefined;
+      } else if (wasTaken && !nextTaken) {
+        if (previous.stockDeducted) {
+          this.adjustMedicationStock(previous.medication, 1);
+        }
+        stockDeducted = undefined;
+      }
+
       meds[rowIndex] = {
-        ...meds[rowIndex],
-        taken: status === 'taken',
+        ...previous,
+        taken: nextTaken,
         skipped: status === 'skipped',
-        takenAt: status === 'taken' ? format(new Date(), 'HH:mm') : undefined,
+        takenAt: nextTaken ? format(new Date(), 'HH:mm') : undefined,
+        stockCycleVersion: nextTaken ? (catalogEntry?.stockCycleVersion ?? 0) : undefined,
+        stockDeducted: nextTaken ? stockDeducted : undefined,
       };
     }
 
@@ -1338,6 +1431,7 @@ class WellnessStore {
     medicationName: string,
     times: string[],
     fallbackRepeat: MedicationRepeatConfig,
+    reminderEnabled?: boolean,
   ) {
     const trimmedName = medicationName.trim();
     const cleanedTimes = [...new Set(times.map((time) => time.trim()).filter(Boolean))];
@@ -1348,12 +1442,72 @@ class WellnessStore {
       ? schedule.repeat
       : normalizeMedicationRepeat(fallbackRepeat);
     const planWeekKey = this.resolveMedicationPlanWeekKey(trimmedName, repeat, weekStartKey);
+    const nextReminderEnabled = reminderEnabled ?? schedule.reminderEnabled;
 
-    const nextPlan = this.applyMedicationPlanTemplates(planWeekKey, trimmedName, cleanedTimes, repeat);
+    const nextPlan = this.applyMedicationPlanTemplates(
+      planWeekKey,
+      trimmedName,
+      cleanedTimes,
+      repeat,
+      nextReminderEnabled,
+    );
     this.spreadMedicationTemplatesForName(planWeekKey, trimmedName, nextPlan);
 
+    this.ensureCatalogEntryForMedication(trimmedName, false);
     this.markCatalogEntryScheduled(trimmedName);
     this.schedulePersist();
+  }
+
+  setMedicationReminderEnabled(medicationName: string, enabled: boolean) {
+    const trimmedName = medicationName.trim();
+    if (!trimmedName) return;
+
+    const nextPlans = { ...this.weekMedicationPlans };
+    let plansChanged = false;
+    for (const [weekKey, plan] of Object.entries(nextPlans)) {
+      let planChanged = false;
+      const nextPlan = plan.map((template) => {
+        if (template.medication.trim() !== trimmedName || template.reminderEnabled === enabled) {
+          return template;
+        }
+        planChanged = true;
+        return { ...template, reminderEnabled: enabled };
+      });
+      if (planChanged) {
+        nextPlans[weekKey] = nextPlan.map((entry) => ({
+          ...entry,
+          repeat: { ...entry.repeat, daysOfWeek: [...entry.repeat.daysOfWeek] },
+        }));
+        plansChanged = true;
+      }
+    }
+    if (plansChanged) {
+      this.weekMedicationPlans = nextPlans;
+    }
+
+    const nextDays = { ...this.days };
+    let daysChanged = false;
+    for (const [dateKey, day] of Object.entries(nextDays)) {
+      let dayChanged = false;
+      const meds = day.medications.map((row) => {
+        if (row.medication.trim() !== trimmedName || row.reminderEnabled === enabled) {
+          return row;
+        }
+        dayChanged = true;
+        return { ...row, reminderEnabled: enabled };
+      });
+      if (dayChanged) {
+        nextDays[dateKey] = { ...day, medications: meds };
+        daysChanged = true;
+      }
+    }
+    if (daysChanged) {
+      this.days = nextDays;
+    }
+
+    if (plansChanged || daysChanged) {
+      this.schedulePersist();
+    }
   }
 
   private getMedicationTimeSlotIndex(
@@ -1479,6 +1633,7 @@ class WellnessStore {
         skipped: existing?.skipped ?? false,
         takenAt: existing?.takenAt,
         reminderEnabled: template.reminderEnabled,
+        stockCycleVersion: existing?.stockCycleVersion,
       };
     });
 
@@ -1513,6 +1668,7 @@ class WellnessStore {
         skipped: existing?.skipped ?? false,
         takenAt: existing?.takenAt,
         reminderEnabled: expected.reminderEnabled,
+        stockCycleVersion: existing?.stockCycleVersion,
       };
     });
 

@@ -30,11 +30,13 @@ export function normalizeGrowthRingsLog(value: unknown): GrowthRingsLog {
   return { actionsByRing, emotionsByRing };
 }
 
-/** Active day level = outermost ring that has at least one action. */
+/** Active day level = outermost ring that has at least one action or emotion. */
 export function getGrowthRingLevel(log: GrowthRingsLog): GrowthRingId | null {
   let level: GrowthRingId | null = null;
   for (const id of GROWTH_RING_IDS) {
-    if ((log.actionsByRing[id]?.length ?? 0) > 0) {
+    const hasActions = (log.actionsByRing[id]?.length ?? 0) > 0;
+    const hasEmotions = (log.emotionsByRing[id]?.length ?? 0) > 0;
+    if (hasActions || hasEmotions) {
       level = id;
     }
   }

@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import type { AppLabels, Language } from '@/constants/i18n';
 import {
   getGrowthRingActionLabel,
   getGrowthRingCopy,
   getGrowthRingEmotionLabel,
 } from '@/constants/growth-ring-labels';
-import { GROWTH_RINGS, type GrowthRingId, getGrowthRingDefinition } from '@/constants/growth-rings';
+import { getGrowthRingDefinition, GROWTH_RINGS, type GrowthRingId } from '@/constants/growth-rings';
+import type { AppLabels, Language } from '@/constants/i18n';
 import { Fonts } from '@/constants/theme';
 import { formatSectionTitle } from '@/constants/typography';
 import { useAppChromeTheme } from '@/hooks/use-app-chrome-theme';
@@ -41,27 +41,147 @@ type Props = {
   onChange: (next: GrowthRingsLog) => void;
 };
 
-const RING_SIZE = 196;
-const RING_STROKE = 16;
-const RING_GAP = 5;
+const RING_WIDTH = 300;
+const RING_HEIGHT = 164;
+/** White gap between colored stadium bands (equal on all sides). */
+const RING_GAP = 3;
+/**
+ * Same band thickness for every ring.
+ * Side (L/R) is thicker than vertical (T/B).
+ */
+const RING_BAND_SIDE = 28;
+const RING_BAND_VERTICAL = 10;
+const RING_BAND = { side: RING_BAND_SIDE, vertical: RING_BAND_VERTICAL } as const;
+/** Concentric stadiums centered in the canvas (as in the mockup). */
+const CENTER_X = RING_WIDTH / 2;
+const CENTER_Y = RING_HEIGHT / 2;
+/** ~2:1 capsule proportion like the mockup. */
+const OUTER_W = 296;
+const OUTER_H = 148;
 
-const RING_COLORS_LIGHT = ['#9BB0A6', '#8FA8B8', '#7A9AAD', '#6B8FA3'] as const;
-const RING_COLORS_MUTED = ['rgba(155,176,166,0.28)', 'rgba(143,168,184,0.28)', 'rgba(122,154,173,0.28)', 'rgba(107,143,163,0.28)'] as const;
+/** Inner → outer: muted blue → soft green. */
+const RING_COLORS_LIGHT = ['#5B7F96', '#71A7B0', '#86B5AC', '#C5E0CA'] as const;
+const RING_COLORS_MUTED = [
+  'rgba(91,127,150,0.34)',
+  'rgba(113,167,176,0.34)',
+  'rgba(134,181,172,0.34)',
+  'rgba(197,224,202,0.34)',
+] as const;
+const CENTER_FILL = '#E8E8E8';
+/** Center digit colors — ring 4 uses a deeper green so it reads on light gray. */
+const RING_CENTER_TEXT = ['#5B7F96', '#71A7B0', '#86B5AC', '#5A8F6E'] as const;
+const CENTER_EMPTY_TEXT = '#9A9A9A';
+
+function getRingBand(_ringId: GrowthRingId): { side: number; vertical: number } {
+  return RING_BAND;
+}
+
+/** Cumulative inset outside this ring's outer edge. */
+function getOuterInset(ringId: GrowthRingId): { side: number; vertical: number } {
+  const outerCount = 4 - ringId;
+  return {
+    side: outerCount * (RING_BAND_SIDE + RING_GAP),
+    vertical: outerCount * (RING_BAND_VERTICAL + RING_GAP),
+  };
+}
+
+/** Outer width/height of the stadium band for this ring. */
+function getRingOuterSize(ringId: GrowthRingId): { width: number; height: number } {
+  const inset = getOuterInset(ringId);
+  return {
+    width: OUTER_W - inset.side * 2,
+    height: OUTER_H - inset.vertical * 2,
+  };
+}
+
+function getCenterSize(): { width: number; height: number } {
+  // 4 bands + 4 gaps (including the gap before the center)
+  const side = 4 * RING_BAND_SIDE + 4 * RING_GAP;
+  const vertical = 4 * RING_BAND_VERTICAL + 4 * RING_GAP;
+  return {
+    width: Math.max(24, OUTER_W - side * 2),
+    height: Math.max(20, OUTER_H - vertical * 2),
+  };
+}
+
+/** Layers from outside in: colored fill, then gap cutout. Center is drawn separately. */
+function getRingLayers(): Array<
+  { key: string; width: number; height: number; kind: 'ring'; ringId: GrowthRingId } | { key: string; width: number; height: number; kind: 'gap' }
+> {
+  const layers: Array<
+    { key: string; width: number; height: number; kind: 'ring'; ringId: GrowthRingId } | { key: string; width: number; height: number; kind: 'gap' }
+  > = [];
+  let side = 0;
+  let vertical = 0;
+
+  for (let id = 4; id >= 1; id -= 1) {
+    const ringId = id as GrowthRingId;
+    layers.push({
+      key: `ring-${id}`,
+      width: OUTER_W - side * 2,
+      height: OUTER_H - vertical * 2,
+      kind: 'ring',
+      ringId,
+    });
+    side += RING_BAND_SIDE;
+    vertical += RING_BAND_VERTICAL;
+    layers.push({
+      key: `gap-${id}`,
+      width: OUTER_W - side * 2,
+      height: OUTER_H - vertical * 2,
+      kind: 'gap',
+    });
+    side += RING_GAP;
+    vertical += RING_GAP;
+  }
+
+  return layers;
+}
+
+function pointInStadium(
+  x: number,
+  y: number,
+  cx: number,
+  cy: number,
+  width: number,
+  height: number,
+): boolean {
+  const rx = width / 2;
+  const ry = height / 2;
+  const dx = Math.abs(x - cx);
+  const dy = Math.abs(y - cy);
+  if (dy > ry || dx > rx) return false;
+  if (dx <= rx - ry) return true;
+  const capOffset = rx - ry;
+  return Math.hypot(dx - capOffset, dy) <= ry;
+}
 
 function resolveRingFromTouch(locationX: number, locationY: number): GrowthRingId {
-  const center = RING_SIZE / 2;
-  const dist = Math.hypot(locationX - center, locationY - center);
-
   for (let ringId = 1; ringId <= 4; ringId += 1) {
-    const inset = (4 - ringId) * (RING_STROKE + RING_GAP);
-    const outerR = (RING_SIZE - inset * 2) / 2;
-    const innerR = outerR - RING_STROKE - RING_GAP / 2;
-    if (dist <= outerR && dist > Math.max(0, innerR)) {
+    const band = getRingBand(ringId as GrowthRingId);
+    const outer = getRingOuterSize(ringId as GrowthRingId);
+    const touchInner = {
+      width: Math.max(0, outer.width - (band.side + RING_GAP) * 2),
+      height: Math.max(0, outer.height - (band.vertical + RING_GAP) * 2),
+    };
+    const inOuter = pointInStadium(locationX, locationY, CENTER_X, CENTER_Y, outer.width, outer.height);
+    const inInner = pointInStadium(
+      locationX,
+      locationY,
+      CENTER_X,
+      CENTER_Y,
+      touchInner.width,
+      touchInner.height,
+    );
+    if (inOuter && !inInner) {
       return ringId as GrowthRingId;
     }
   }
 
-  if (dist <= RING_SIZE / 2) return 1;
+  const center = getCenterSize();
+  if (pointInStadium(locationX, locationY, CENTER_X, CENTER_Y, center.width, center.height)) {
+    return 1;
+  }
   return 4;
 }
 
@@ -76,37 +196,39 @@ function RingsCanvas({
   theme: ThemeSlice;
   accessibilityLabel: string;
 }) {
+  const center = getCenterSize();
+  const layers = getRingLayers();
+
   return (
     <Pressable
-      style={[styles.ringsCanvas, { width: RING_SIZE, height: RING_SIZE }]}
+      style={[styles.ringsCanvas, { width: RING_WIDTH, height: RING_HEIGHT }]}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       onPress={(event) => {
         const { locationX, locationY } = event.nativeEvent;
         onPressRing(resolveRingFromTouch(locationX, locationY));
       }}>
-      {[4, 3, 2, 1].map((id) => {
-        const ringId = id as GrowthRingId;
-        const index = ringId - 1;
-        const inset = (4 - ringId) * (RING_STROKE + RING_GAP);
-        const size = RING_SIZE - inset * 2;
-        const active = level !== null && ringId <= level;
-        const color = active ? RING_COLORS_LIGHT[index] : RING_COLORS_MUTED[index];
+      {layers.map((layer) => {
+        const fill =
+          layer.kind === 'gap'
+            ? theme.inactiveBg
+            : level !== null && layer.ringId <= level
+              ? RING_COLORS_LIGHT[layer.ringId - 1]
+              : RING_COLORS_MUTED[layer.ringId - 1];
 
         return (
           <View
-            key={ringId}
+            key={layer.key}
             pointerEvents="none"
             style={[
               styles.ringVisual,
               {
-                width: size,
-                height: size,
-                borderRadius: size / 2,
-                borderWidth: RING_STROKE,
-                borderColor: color,
-                top: inset,
-                left: inset,
+                width: layer.width,
+                height: layer.height,
+                borderRadius: layer.height / 2,
+                backgroundColor: fill,
+                top: CENTER_Y - layer.height / 2,
+                left: CENTER_X - layer.width / 2,
               },
             ]}
           />
@@ -117,11 +239,24 @@ function RingsCanvas({
         style={[
           styles.ringsCenter,
           {
-            backgroundColor: level ? RING_COLORS_LIGHT[Math.max(0, (level ?? 1) - 1)] : theme.sectionLabelBg,
+            width: center.width,
+            height: center.height,
+            borderRadius: center.height / 2,
+            left: CENTER_X - center.width / 2,
+            top: CENTER_Y - center.height / 2,
+            backgroundColor: CENTER_FILL,
             borderColor: theme.subtlePanelBorder,
           },
         ]}>
-        <Text style={[styles.ringsCenterText, { color: level ? '#FFFFFF' : theme.textSecondary }]}>
+        <Text
+          style={[
+            styles.ringsCenterText,
+            {
+              color: level
+                ? RING_CENTER_TEXT[Math.max(0, (level ?? 1) - 1)]
+                : CENTER_EMPTY_TEXT,
+            },
+          ]}>
           {level ?? '·'}
         </Text>
       </View>
@@ -201,14 +336,14 @@ export function GrowthRingsSection({ language, labels, value, onChange }: Props)
       <View style={styles.body}>
         <Text style={[styles.hint, { color: theme.textSecondary }]}>{labels.growthRingTapHint}</Text>
 
-        <View style={styles.ringsRow}>
+        <View style={styles.ringsBlock}>
           <RingsCanvas
             level={level}
             onPressRing={setSelectedRing}
             theme={theme}
             accessibilityLabel={labels.whereAmIToday}
           />
-          <View style={styles.legendColumn}>
+          <View style={styles.legendGrid}>
             {GROWTH_RINGS.map((ring) => {
               const copy = getGrowthRingCopy(language, ring.id);
               const count = countRingSelections(value, ring.id);
@@ -217,7 +352,7 @@ export function GrowthRingsSection({ language, labels, value, onChange }: Props)
                 <Pressable
                   key={ring.id}
                   onPress={() => setSelectedRing(ring.id)}
-                  style={({ pressed }) => [styles.legendRow, pressed && styles.pressed]}>
+                  style={({ pressed }) => [styles.legendCell, pressed && styles.pressed]}>
                   <View
                     style={[
                       styles.legendDot,
@@ -350,40 +485,37 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     fontFamily: Fonts.sans,
   },
-  ringsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  ringsBlock: {
     alignItems: 'center',
-    justifyContent: 'center',
     gap: 14,
   },
   ringsCanvas: {
     position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignSelf: 'center',
   },
   ringVisual: {
     position: 'absolute',
-    backgroundColor: 'transparent',
   },
   ringsCenter: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 1,
+    position: 'absolute',
+    borderWidth: 0,
     alignItems: 'center',
     justifyContent: 'center',
   },
   ringsCenterText: {
-    fontSize: 16,
+    fontSize: 15,
     fontFamily: Fonts.sansBold,
   },
-  legendColumn: {
-    flex: 1,
-    gap: 8,
-    minWidth: 0,
+  legendGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    width: '100%',
+    columnGap: 10,
+    rowGap: 10,
   },
-  legendRow: {
+  legendCell: {
+    width: '47%',
+    flexGrow: 1,
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 8,

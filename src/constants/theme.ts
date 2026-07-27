@@ -20,6 +20,7 @@ export const Colors = {
     panicRow: '#F2EBE8',
     cardSurface: '#FCFDFC',
     medicationCompleted: '#7A8F86',
+    weekdayName: '#D19174',
   },
   dark: {
     text: '#F2F2F2',
@@ -33,6 +34,7 @@ export const Colors = {
     panicRow: '#241C1A',
     cardSurface: '#151C18',
     medicationCompleted: '#8FA89A',
+    weekdayName: '#D19174',
   },
 } as const;
 
@@ -70,7 +72,7 @@ const DAY_WEEK_LIGHT: Record<WeekdayIndex, string> = {
   2: '#E0E9EE', // Tuesday — blue mist
   3: '#EEE9E2', // Wednesday — warm sand
   4: '#E2EEE9', // Thursday — sea foam
-  5: '#E5EDDF', // Friday — moss
+  5: '#FAF7EB', // Friday — soft parchment
   6: '#EEE3E8', // Saturday — dusty rose
 };
 

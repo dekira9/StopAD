@@ -3,7 +3,7 @@ import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { NavigationBar } from 'expo-navigation-bar';
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import {
   Dimensions,
   Platform,
@@ -55,7 +55,7 @@ export function SleepNightObservationOverlay({ labels, onClose, onFinish }: Prop
   const restoreAppChrome = useAppSystemChromeRestore();
   const restoreAppChromeRef = useRef(restoreAppChrome);
   restoreAppChromeRef.current = restoreAppChrome;
-  const [events, setEvents] = useState<NightObservationEvent[]>([]);
+  const eventsRef = useRef<NightObservationEvent[]>([]);
   const screen = Dimensions.get('screen');
 
   const activateChrome = useCallback(() => {
@@ -78,21 +78,25 @@ export function SleepNightObservationOverlay({ labels, onClose, onFinish }: Prop
     };
   }, [activateChrome]);
 
+  const pushEvent = (type: NightObservationEvent['type']) => {
+    eventsRef.current = recordEvent(type, eventsRef.current);
+  };
+
   const handleAwakePress = () => {
     void playSoftTapSound();
-    setEvents((prev) => recordEvent('awake', prev));
+    pushEvent('awake');
     void startShushSound();
   };
 
   const handleAsleepPress = () => {
     void playSoftTapSound();
-    setEvents((prev) => recordEvent('asleep', prev));
+    pushEvent('asleep');
     void stopShushSound();
   };
 
   const handleFinish = () => {
     void stopShushSound();
-    const nightLog = buildSleepLogFromNightEvents(events);
+    const nightLog = buildSleepLogFromNightEvents(eventsRef.current);
     if (nightLog) {
       onFinish(nightLog);
     }

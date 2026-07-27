@@ -15,6 +15,8 @@ export type AppChromeTheme = {
   sectionLabelBg: string;
   notesBlockBg: string;
   medicationCompleted: string;
+  /** Muted blue for medication name / dose / time fields in day rows. */
+  medicationFieldText: string;
   accent: string;
   panelEdgeShadow: number;
   footerBorder: string;
@@ -73,6 +75,7 @@ export function buildAppChromeTheme(theme: AppColorTheme, isDark: boolean): AppC
     sectionLabelBg: theme.backgroundSelected,
     notesBlockBg: isDark ? 'rgba(21,28,24,0.70)' : Colors.light.cardSurface,
     medicationCompleted: isDark ? Colors.dark.medicationCompleted : Colors.light.medicationCompleted,
+    medicationFieldText: isDark ? '#8AA9B8' : Colors.light.todayMarker,
     accent: theme.accent,
     panelEdgeShadow: isDark ? 0.22 : 0.09,
     footerBorder: isDark ? 'rgba(125,168,146,0.22)' : 'rgba(107,144,128,0.16)',

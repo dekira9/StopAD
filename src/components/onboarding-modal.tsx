@@ -27,21 +27,26 @@ type Props = {
   onComplete: (result: OnboardingResult) => void;
 };
 
-/** 0 language · 1 hello · 2 not catastrophe · 3 manage · 4 growth rings · 5 week */
-const STEP_COUNT = 6;
+/** 0 language · 1 hello · 2 not catastrophe · 3 manage · 4 observe · 5 growth rings · 6 week */
+const STEP_COUNT = 7;
 
 type IllustrationName = ComponentProps<typeof Ionicons>['name'];
 
-const RING_ILLUSTRATION_SIZE = 128;
-const RING_ILLUSTRATION_STROKE = 11;
-const RING_ILLUSTRATION_GAP = 4;
-const RING_ILLUSTRATION_COLORS = ['#9BB0A6', '#8FA8B8', '#7A9AAD', '#6B8FA3'] as const;
+const RING_ILLUSTRATION_WIDTH = 176;
+const RING_ILLUSTRATION_HEIGHT = 88;
+const RING_ILLUSTRATION_GAP = 2;
+/** Same for every ring: L/R thicker than T/B. */
+const RING_ILLUSTRATION_BAND_SIDE = 16;
+const RING_ILLUSTRATION_BAND_VERTICAL = 6;
+const RING_ILLUSTRATION_COLORS = ['#5B7F96', '#71A7B0', '#86B5AC', '#C5E0CA'] as const;
 const RING_ILLUSTRATION_MUTED = [
-  'rgba(155,176,166,0.35)',
-  'rgba(143,168,184,0.35)',
-  'rgba(122,154,173,0.35)',
-  'rgba(107,143,163,0.35)',
+  'rgba(91,127,150,0.36)',
+  'rgba(113,167,176,0.36)',
+  'rgba(134,181,172,0.36)',
+  'rgba(197,224,202,0.36)',
 ] as const;
+const RING_ILLUSTRATION_CENTER = '#E8E8E8';
+const RING_ILLUSTRATION_GAP_FILL = '#FFFFFF';
 
 function StepIllustration({
   name,
@@ -68,41 +73,68 @@ function GrowthRingsIllustration({
   centerLabel: string;
   captionColor: string;
 }) {
+  const outerW = RING_ILLUSTRATION_WIDTH;
+  const outerH = RING_ILLUSTRATION_HEIGHT;
+  const cx = outerW / 2;
+  const cy = outerH / 2;
+
+  const layers: Array<{ key: string; width: number; height: number; color: string }> = [];
+  let side = 0;
+  let vertical = 0;
+  for (let id = 4; id >= 1; id -= 1) {
+    const index = id - 1;
+    layers.push({
+      key: `ring-${id}`,
+      width: outerW - side * 2,
+      height: outerH - vertical * 2,
+      color: id <= 2 ? RING_ILLUSTRATION_COLORS[index] : RING_ILLUSTRATION_MUTED[index],
+    });
+    side += RING_ILLUSTRATION_BAND_SIDE;
+    vertical += RING_ILLUSTRATION_BAND_VERTICAL;
+    layers.push({
+      key: `gap-${id}`,
+      width: outerW - side * 2,
+      height: outerH - vertical * 2,
+      color: RING_ILLUSTRATION_GAP_FILL,
+    });
+    side += RING_ILLUSTRATION_GAP;
+    vertical += RING_ILLUSTRATION_GAP;
+  }
+
+  const centerW = Math.max(14, outerW - side * 2);
+  const centerH = Math.max(12, outerH - vertical * 2);
+
   return (
     <View style={styles.ringsIllustrationWrap} accessibilityLabel={centerLabel}>
-      <View style={[styles.ringsCanvas, { width: RING_ILLUSTRATION_SIZE, height: RING_ILLUSTRATION_SIZE }]}>
-        {[4, 3, 2, 1].map((id) => {
-          const index = id - 1;
-          const inset = (4 - id) * (RING_ILLUSTRATION_STROKE + RING_ILLUSTRATION_GAP);
-          const size = RING_ILLUSTRATION_SIZE - inset * 2;
-          // Inner rings are “now”; outer rings hint at wider life
-          const color = id <= 2 ? RING_ILLUSTRATION_COLORS[index] : RING_ILLUSTRATION_MUTED[index];
-
-          return (
-            <View
-              key={id}
-              pointerEvents="none"
-              style={[
-                styles.ringVisual,
-                {
-                  width: size,
-                  height: size,
-                  borderRadius: size / 2,
-                  borderWidth: RING_ILLUSTRATION_STROKE,
-                  borderColor: color,
-                  top: inset,
-                  left: inset,
-                },
-              ]}
-            />
-          );
-        })}
+      <View style={[styles.ringsCanvas, { width: outerW, height: outerH }]}>
+        {layers.map((layer) => (
+          <View
+            key={layer.key}
+            pointerEvents="none"
+            style={[
+              styles.ringVisual,
+              {
+                width: layer.width,
+                height: layer.height,
+                borderRadius: layer.height / 2,
+                backgroundColor: layer.color,
+                top: cy - layer.height / 2,
+                left: cx - layer.width / 2,
+              },
+            ]}
+          />
+        ))}
         <View
           pointerEvents="none"
           style={[
             styles.ringsCenter,
             {
-              backgroundColor: RING_ILLUSTRATION_COLORS[0],
+              width: centerW,
+              height: centerH,
+              borderRadius: centerH / 2,
+              left: cx - centerW / 2,
+              top: cy - centerH / 2,
+              backgroundColor: RING_ILLUSTRATION_CENTER,
             },
           ]}
         />
@@ -149,6 +181,8 @@ export function OnboardingModal({
       case 3:
         return labels.onboardingSlide3Title;
       case 4:
+        return labels.onboardingSlideObserveTitle;
+      case 5:
         return labels.onboardingSlide4Title;
       default:
         return labels.onboardingSlide5Title;
@@ -166,6 +200,8 @@ export function OnboardingModal({
       case 3:
         return labels.onboardingSlide3Body;
       case 4:
+        return labels.onboardingSlideObserveBody;
+      case 5:
         return labels.onboardingSlide4Body;
       default:
         return labels.onboardingSlide5Body;
@@ -180,7 +216,9 @@ export function OnboardingModal({
         return 'shield-checkmark-outline' as const;
       case 3:
         return 'leaf-outline' as const;
-      case 5:
+      case 4:
+        return 'eye-outline' as const;
+      case 6:
         return 'calendar-outline' as const;
       default:
         return null;
@@ -247,7 +285,7 @@ export function OnboardingModal({
             </View>
           ) : null}
 
-          {step === 4 ? (
+          {step === 5 ? (
             <GrowthRingsIllustration
               centerLabel={labels.onboardingSlide4RingHint}
               captionColor={theme.textSecondary}
@@ -267,7 +305,14 @@ export function OnboardingModal({
           {step === 1 ? (
             <Text style={[styles.brandTagline, { color: theme.activeBg }]}>{labels.appTagline}</Text>
           ) : null}
-          <Text style={[styles.body, { color: theme.textSecondary }]}>{stepBody}</Text>
+          <Text
+            style={[
+              styles.body,
+              step === 4 && styles.quoteBody,
+              { color: theme.textSecondary },
+            ]}>
+            {stepBody}
+          </Text>
 
           {step === 3 ? (
             <Pressable onPress={onLearnMore} style={({ pressed }) => [styles.learnMoreBtn, pressed && styles.pressed]}>
@@ -379,16 +424,12 @@ const styles = StyleSheet.create({
   },
   ringsCanvas: {
     position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   ringVisual: {
     position: 'absolute',
   },
   ringsCenter: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    position: 'absolute',
   },
   ringsCaption: {
     fontSize: 12,
@@ -397,6 +438,7 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 24, fontWeight: '700', lineHeight: 30 },
   body: { fontSize: 15, lineHeight: 22 },
+  quoteBody: { fontSize: 16, lineHeight: 26, fontStyle: 'italic', textAlign: 'center' },
   learnMoreBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
   learnMoreText: { fontSize: 13, fontWeight: '700' },
   langList: { gap: 8, marginTop: 8 },

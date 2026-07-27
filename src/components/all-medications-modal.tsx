@@ -1,8 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
+import { BlurTargetView, BlurView } from 'expo-blur';
 import { addMonths, format, parse } from 'date-fns';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { MedicineBottleIcon, ScheduleIcon } from '@/components/medical-ui-icons';
+import { MedicationRefillReminderModal } from '@/components/medication-refill-reminder-modal';
+import { MedicationStockEditModal } from '@/components/medication-stock-edit-modal';
+import { MedicationStockModal } from '@/components/medication-stock-modal';
 import type { AppLabels } from '@/constants/i18n';
 import { Fonts } from '@/constants/theme';
 import { formatSectionTitle, weekButtonTextStyle, weekDayTitleStyle, weekFieldLabelStyle } from '@/constants/typography';
@@ -13,6 +18,8 @@ import {
   wellnessStore,
 } from '@/stores/wellness-store';
 
+const HEADER_HEIGHT = 48;
+
 type AllMedicationsLabels = AppLabels & {
   allMedicationsCurrent: string;
   allMedicationsCompleted: string;
@@ -22,7 +29,11 @@ type Props = {
   visible: boolean;
   labels: AllMedicationsLabels;
   onClose: () => void;
+  onAddMedication: () => void;
   onOpenSchedule: (entry: MedicationCatalogEntry) => void;
+  /** After create: open stock hub for this catalog entry. */
+  initialStockCatalogId?: string | null;
+  onInitialStockHandled?: () => void;
 };
 
 function loadVisibleMedicationEntries() {
@@ -30,20 +41,38 @@ function loadVisibleMedicationEntries() {
   return wellnessStore.visibleMedicationCatalog;
 }
 
-type ContentProps = Omit<Props, 'visible'>;
+type ShellProps = Omit<Props, 'visible'>;
 
-function AllMedicationsModalContent({ labels, onClose, onOpenSchedule }: ContentProps) {
-  const { modal: theme } = useAppChromeTheme();
+function AllMedicationsModalShell({
+  labels,
+  onClose,
+  onAddMedication,
+  onOpenSchedule,
+  initialStockCatalogId,
+  onInitialStockHandled,
+}: ShellProps) {
+  const { modal: theme, isDark } = useAppChromeTheme();
+  const blurTargetRef = useRef<View | null>(null);
   const [entries, setEntries] = useState<MedicationCatalogEntry[]>(loadVisibleMedicationEntries);
+  const [stockTarget, setStockTarget] = useState<MedicationCatalogEntry | null>(null);
+  const [showStockEdit, setShowStockEdit] = useState(false);
+  const [showRefillReminder, setShowRefillReminder] = useState(false);
 
   const loadEntries = useCallback(() => {
     setEntries(loadVisibleMedicationEntries());
   }, []);
 
-  const handleAdd = () => {
-    wellnessStore.addMedicationCatalogEntry();
-    loadEntries();
-  };
+  useEffect(() => {
+    if (!initialStockCatalogId) return;
+    const nextEntries = loadVisibleMedicationEntries();
+    setEntries(nextEntries);
+    const entry = nextEntries.find((item) => item.id === initialStockCatalogId);
+    if (entry) {
+      setStockTarget(entry);
+      setShowStockEdit(true);
+    }
+    onInitialStockHandled?.();
+  }, [initialStockCatalogId, onInitialStockHandled]);
 
   const handleRemove = (id: string) => {
     wellnessStore.removeMedicationCatalogEntry(id);
@@ -131,106 +160,211 @@ function AllMedicationsModalContent({ labels, onClose, onOpenSchedule }: Content
             <View style={styles.deleteBtn} />
           )}
         </View>
-        <Pressable
-          onPress={() => onOpenSchedule(entry)}
-          style={({ pressed }) => [
-            styles.scheduleBtn,
-            { borderColor: theme.inactiveBorder },
-            pressed && styles.pressed,
-          ]}>
-          <Ionicons name="calendar-outline" size={14} color={theme.text} />
-          <Text style={[styles.scheduleBtnText, { color: theme.inactiveText }]}>
-            {formatSectionTitle(labels.medicationScheduleButton)}
-          </Text>
-        </Pressable>
+        <View style={styles.actionRow}>
+          <Pressable
+            onPress={() => onOpenSchedule(entry)}
+            style={({ pressed }) => [
+              styles.actionBtn,
+              { borderColor: theme.inactiveBorder },
+              pressed && styles.pressed,
+            ]}>
+            <ScheduleIcon size={18} color={theme.text} />
+            <Text style={[styles.actionBtnText, { color: theme.inactiveText }]}>
+              {formatSectionTitle(labels.medicationScheduleButton)}
+            </Text>
+            <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />
+          </Pressable>
+          <Pressable
+            onPress={() => setStockTarget(entry)}
+            style={({ pressed }) => [
+              styles.actionBtn,
+              { borderColor: theme.inactiveBorder },
+              pressed && styles.pressed,
+            ]}>
+            <MedicineBottleIcon size={18} color={theme.text} />
+            <Text style={[styles.actionBtnText, { color: theme.inactiveText }]}>
+              {formatSectionTitle(labels.medicationStockAndRefillButton)}
+            </Text>
+            <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />
+          </Pressable>
+        </View>
       </View>
     );
   };
 
   return (
-      <View style={[styles.overlay, { backgroundColor: theme.modalOverlay }]}>
-        <View style={[styles.card, { backgroundColor: theme.modalBg, borderColor: theme.subtlePanelBorder }]}>
-          <View style={styles.headerRow}>
-            <View style={styles.headerBtn} />
-            <Text style={[styles.title, { color: theme.text }]}>{formatSectionTitle(labels.allMedicationsTitle)}</Text>
-            <Pressable onPress={onClose} hitSlop={8} style={({ pressed }) => [styles.headerBtn, pressed && styles.pressed]}>
-              <Ionicons name="close" size={20} color={theme.text} />
-            </Pressable>
-          </View>
-
-          <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
-            {entries.length === 0 ? (
-              <Text style={[styles.emptyText, { color: theme.textSecondary }]}>{labels.allMedicationsEmpty}</Text>
-            ) : (
-              <>
-                {currentEntries.length > 0 ? (
-                  <View style={styles.section}>
-                    <Text style={[styles.sectionTitle, { color: theme.activeBg }]}>
-                      {labels.allMedicationsCurrent}
+    <>
+      <Modal transparent visible animationType="slide" onRequestClose={onClose}>
+        <View style={[styles.overlay, { backgroundColor: theme.modalOverlay }]}>
+          {stockTarget ? (
+            <MedicationStockModal
+              embedded
+              visible
+              labels={labels}
+              name={stockTarget.name}
+              dose={stockTarget.dose}
+              stockCount={stockTarget.stockCount}
+              refillReminderCount={stockTarget.refillReminderCount}
+              packageSize={stockTarget.packageSize}
+              onClose={() => {
+                setShowStockEdit(false);
+                setShowRefillReminder(false);
+                setStockTarget(null);
+              }}
+              onOpenStockEdit={() => setShowStockEdit(true)}
+              onOpenRefillReminder={() => setShowRefillReminder(true)}
+            />
+          ) : (
+            <View style={[styles.card, { backgroundColor: theme.modalBg, borderColor: theme.subtlePanelBorder }]}>
+              <BlurTargetView ref={blurTargetRef} style={styles.blurTarget}>
+                <ScrollView
+                  style={styles.scroll}
+                  contentContainerStyle={[styles.scrollContent, { paddingTop: HEADER_HEIGHT + 8 }]}>
+                  {entries.length === 0 ? (
+                    <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+                      {labels.allMedicationsEmpty}
                     </Text>
-                    {currentEntries.map(renderEntry)}
-                  </View>
-                ) : null}
-                {completedEntries.length > 0 ? (
-                  <View style={styles.section}>
-                    <Text style={[styles.sectionTitle, { color: theme.activeBg }]}>
-                      {labels.allMedicationsCompleted}
-                    </Text>
-                    {completedEntries.map(renderEntry)}
-                  </View>
-                ) : null}
-              </>
-            )}
-          </ScrollView>
+                  ) : (
+                    <>
+                      {currentEntries.length > 0 ? (
+                        <View style={styles.section}>
+                          <Text style={[styles.sectionTitle, { color: theme.activeBg }]}>
+                            {labels.allMedicationsCurrent}
+                          </Text>
+                          {currentEntries.map(renderEntry)}
+                        </View>
+                      ) : null}
+                      {completedEntries.length > 0 ? (
+                        <View style={styles.section}>
+                          <Text style={[styles.sectionTitle, { color: theme.activeBg }]}>
+                            {labels.allMedicationsCompleted}
+                          </Text>
+                          {completedEntries.map(renderEntry)}
+                        </View>
+                      ) : null}
+                    </>
+                  )}
+                </ScrollView>
+              </BlurTargetView>
 
-          <View style={styles.footer}>
-            <Pressable
-              onPress={handleAdd}
-              style={({ pressed }) => [
-                styles.addButton,
-                {
-                  backgroundColor: theme.inactiveBg,
-                  borderColor: theme.inactiveBorder,
-                  shadowOpacity: theme.buttonShadow,
-                },
-                pressed && styles.pressed,
-              ]}>
-              <View style={styles.addButtonIcon}>
-                <Ionicons name="add-circle-outline" size={16} color={theme.activeBg} />
+              <BlurView
+                blurTarget={blurTargetRef}
+                blurMethod="dimezisBlurViewSdk31Plus"
+                intensity={42}
+                tint={isDark ? 'dark' : 'light'}
+                style={[styles.headerGlass, { borderBottomColor: theme.subtlePanelBorder }]}>
+                <View
+                  style={[
+                    styles.headerGlassTint,
+                    { backgroundColor: isDark ? 'rgba(21,28,24,0.90)' : 'rgba(255,255,255,0.90)' },
+                  ]}
+                />
+                <View style={styles.headerRow}>
+                  <View style={styles.headerBtn} />
+                  <Text style={[styles.title, { color: theme.text }]}>
+                    {formatSectionTitle(labels.allMedicationsTitle)}
+                  </Text>
+                  <Pressable
+                    onPress={onClose}
+                    hitSlop={8}
+                    style={({ pressed }) => [styles.headerBtn, pressed && styles.pressed]}>
+                    <Ionicons name="close" size={20} color={theme.text} />
+                  </Pressable>
+                </View>
+              </BlurView>
+
+              <View style={[styles.footer, { backgroundColor: theme.modalBg }]}>
+                <Pressable
+                  onPress={onAddMedication}
+                  style={({ pressed }) => [
+                    styles.addButton,
+                    {
+                      backgroundColor: theme.sectionLabelBg,
+                      borderColor: theme.rowBorder,
+                      shadowOpacity: theme.buttonShadow,
+                    },
+                    pressed && styles.pressed,
+                  ]}>
+                  <Ionicons name="add-circle-outline" size={16} color={theme.activeBg} />
+                  <Text style={[styles.addButtonText, { color: theme.activeBg }]}>{labels.addMedication}</Text>
+                </Pressable>
+                <Pressable
+                  onPress={onClose}
+                  style={({ pressed }) => [
+                    styles.doneButton,
+                    {
+                      backgroundColor: theme.activeBg,
+                      borderColor: theme.activeBg,
+                      shadowOpacity: theme.buttonShadow,
+                    },
+                    pressed && styles.pressed,
+                  ]}>
+                  <Text style={[styles.doneButtonText, { color: theme.activeText }]}>{labels.done}</Text>
+                </Pressable>
               </View>
-              <Text style={[styles.addButtonText, { color: theme.activeBg }]}>{labels.addMedication}</Text>
-            </Pressable>
-            <Pressable
-              onPress={onClose}
-              style={({ pressed }) => [
-                styles.doneButton,
-                {
-                  backgroundColor: theme.activeBg,
-                  borderColor: theme.activeBg,
-                  shadowOpacity: theme.buttonShadow,
-                },
-                pressed && styles.pressed,
-              ]}>
-              <Text style={[styles.doneButtonText, { color: theme.activeText }]}>{labels.done}</Text>
-            </Pressable>
-          </View>
+            </View>
+          )}
         </View>
-      </View>
+      </Modal>
+
+      <MedicationStockEditModal
+        visible={showStockEdit && stockTarget !== null}
+        labels={labels}
+        initialRemaining={stockTarget?.stockCount}
+        initialPackageSize={stockTarget?.packageSize}
+        onClose={() => setShowStockEdit(false)}
+        onSave={({ stockCount, packageSize }) => {
+          if (!stockTarget) return;
+          wellnessStore.updateMedicationCatalogEntry(stockTarget.id, { stockCount, packageSize });
+          loadEntries();
+          setStockTarget((current) => (current ? { ...current, stockCount, packageSize } : current));
+          setShowStockEdit(false);
+        }}
+      />
+
+      <MedicationRefillReminderModal
+        visible={showRefillReminder && stockTarget !== null}
+        labels={labels}
+        initialEnabled={stockTarget?.refillReminderEnabled !== false}
+        initialCount={stockTarget?.refillReminderCount}
+        onClose={() => setShowRefillReminder(false)}
+        onSave={({ refillReminderEnabled, refillReminderCount }) => {
+          if (!stockTarget) return;
+          wellnessStore.updateMedicationCatalogEntry(stockTarget.id, {
+            refillReminderEnabled,
+            refillReminderCount,
+          });
+          loadEntries();
+          setStockTarget((current) =>
+            current ? { ...current, refillReminderEnabled, refillReminderCount } : current,
+          );
+          setShowRefillReminder(false);
+        }}
+      />
+    </>
   );
 }
 
-export function AllMedicationsModal({ visible, labels, onClose, onOpenSchedule }: Props) {
+export function AllMedicationsModal({
+  visible,
+  labels,
+  onClose,
+  onAddMedication,
+  onOpenSchedule,
+  initialStockCatalogId,
+  onInitialStockHandled,
+}: Props) {
+  if (!visible) return null;
   return (
-    <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
-      {visible ? (
-        <AllMedicationsModalContent
-          key="all-medications-open"
-          labels={labels}
-          onClose={onClose}
-          onOpenSchedule={onOpenSchedule}
-        />
-      ) : null}
-    </Modal>
+    <AllMedicationsModalShell
+      key="all-medications-open"
+      labels={labels}
+      onClose={onClose}
+      onAddMedication={onAddMedication}
+      onOpenSchedule={onOpenSchedule}
+      initialStockCatalogId={initialStockCatalogId}
+      onInitialStockHandled={onInitialStockHandled}
+    />
   );
 }
 
@@ -245,19 +379,44 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     borderWidth: 1,
-    paddingTop: 12,
+    paddingTop: 0,
     paddingBottom: 24,
+    overflow: 'hidden',
+  },
+  headerGlass: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 2,
+    overflow: 'hidden',
+    borderTopLeftRadius: 19,
+    borderTopRightRadius: 19,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  headerGlassTint: {
+    ...StyleSheet.absoluteFillObject,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    minHeight: HEADER_HEIGHT,
     paddingHorizontal: 16,
+    paddingTop: 12,
     paddingBottom: 12,
   },
   headerBtn: { minWidth: 28, alignItems: 'flex-end' },
   title: { ...weekDayTitleStyle, textAlign: 'center' },
-  scroll: { flexGrow: 0 },
+  blurTarget: {
+    flexGrow: 0,
+    flexShrink: 1,
+    minHeight: 0,
+  },
+  scroll: {
+    flexGrow: 0,
+    flexShrink: 1,
+  },
   scrollContent: { paddingHorizontal: 16, paddingBottom: 8, gap: 14 },
   emptyText: { fontSize: 12, textAlign: 'center', paddingVertical: 24 },
   section: { gap: 8 },
@@ -288,21 +447,34 @@ const styles = StyleSheet.create({
   },
   nameInput: { fontSize: 13, fontWeight: '700', paddingVertical: 0 },
   doseInput: { fontSize: 12, fontFamily: Fonts.mono, paddingVertical: 0 },
-  scheduleBtn: {
+  actionRow: {
+    flexDirection: 'column',
+    gap: 8,
+  },
+  actionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
+    justifyContent: 'flex-start',
+    gap: 8,
     borderWidth: 1,
     borderRadius: 10,
     paddingVertical: 8,
     paddingHorizontal: 10,
   },
-  scheduleBtnText: {
+  actionBtnText: {
     ...weekButtonTextStyle,
+    flex: 1,
     flexShrink: 1,
+    textAlign: 'left',
   },
-  footer: { paddingHorizontal: 16, paddingTop: 8, gap: 8 },
+  footer: {
+    flexGrow: 0,
+    flexShrink: 0,
+    zIndex: 3,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    gap: 8,
+  },
   addButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -316,13 +488,12 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
   },
-  addButtonIcon: {
-    width: 24,
-    height: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
+  addButtonText: {
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
   },
-  addButtonText: { ...weekButtonTextStyle },
   doneButton: {
     alignItems: 'center',
     justifyContent: 'center',

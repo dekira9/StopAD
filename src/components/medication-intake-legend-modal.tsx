@@ -2,17 +2,14 @@ import { Ionicons } from '@expo/vector-icons';
 import type { ReactNode } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { BellOnIcon, ScheduleIcon } from '@/components/medical-ui-icons';
 import type { AppLabels } from '@/constants/i18n';
 import { Fonts } from '@/constants/theme';
 import { useAppChromeTheme } from '@/hooks/use-app-chrome-theme';
 
-type LegendLabels = AppLabels & {
-  medicationIntakeLegendSetTime: string;
-};
-
 type Props = {
   visible: boolean;
-  labels: LegendLabels;
+  labels: AppLabels;
   onClose: () => void;
 };
 
@@ -40,22 +37,30 @@ export function MedicationIntakeLegendModal({ visible, labels, onClose }: Props)
         <Pressable
           style={[styles.card, { backgroundColor: theme.modalBg, borderColor: theme.subtlePanelBorder }]}
           onPress={() => {}}>
-          <Text style={[styles.title, { color: theme.textSecondary }]}>{labels.medicationIntakeLegendTitle}</Text>
+          <View style={styles.headerRow}>
+            <Text style={[styles.title, { color: theme.textSecondary }]}>{labels.medicationIntakeLegendTitle}</Text>
+            <Pressable
+              onPress={onClose}
+              hitSlop={8}
+              style={({ pressed }) => [styles.closeBtn, pressed && styles.pressed]}>
+              <Ionicons name="close" size={20} color={theme.text} />
+            </Pressable>
+          </View>
 
           <LegendRow
-            icon={<Ionicons name="notifications-outline" size={28} color={theme.text} />}
+            icon={<BellOnIcon size={24} color={theme.text} />}
             text={labels.medicationIntakeLegendBell}
             textColor={theme.text}
           />
           <LegendRow
-            icon={<Ionicons name="time-outline" size={28} color={theme.text} />}
-            text={labels.medicationIntakeLegendSetTime}
+            icon={<ScheduleIcon size={24} color={theme.text} />}
+            text={labels.medicationScheduleButton}
             textColor={theme.text}
           />
           <LegendRow
             icon={
-              <View style={[styles.takeButtonSample, { backgroundColor: theme.activeBg, borderColor: theme.activeBg }]}>
-                <Text style={[styles.takeButtonSampleText, { color: theme.activeText }]} numberOfLines={1}>
+              <View style={[styles.takeButtonSample, { backgroundColor: theme.sectionLabelBg, borderColor: theme.rowBorder }]}>
+                <Text style={[styles.takeButtonSampleText, { color: theme.textSecondary }]} numberOfLines={1}>
                   {labels.medicationTake}
                 </Text>
               </View>
@@ -79,16 +84,6 @@ export function MedicationIntakeLegendModal({ visible, labels, onClose }: Props)
             text={labels.medicationIntakeLegendNumber}
             textColor={theme.text}
           />
-
-          <Pressable
-            onPress={onClose}
-            style={({ pressed }) => [
-              styles.doneButton,
-              { backgroundColor: theme.activeBg, borderColor: theme.activeBg },
-              pressed && styles.pressed,
-            ]}>
-            <Text style={[styles.doneButtonText, { color: theme.activeText }]}>{labels.done}</Text>
-          </Pressable>
         </Pressable>
       </Pressable>
     </Modal>
@@ -112,11 +107,24 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   title: {
+    flex: 1,
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 2,
     textTransform: 'uppercase',
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
     marginBottom: 2,
+  },
+  closeBtn: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   legendRow: {
     flexDirection: 'row',
@@ -166,20 +174,6 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.mono,
     lineHeight: 22,
     fontWeight: '700',
-  },
-  doneButton: {
-    marginTop: 4,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingVertical: 14,
-  },
-  doneButtonText: {
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
   },
   pressed: {
     opacity: 0.85,
