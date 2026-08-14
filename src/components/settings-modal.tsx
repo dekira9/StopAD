@@ -1,8 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { LegalDocModal } from '@/components/legal-doc-modal';
 import { LANGUAGES, type AppLabels, type Language } from '@/constants/i18n';
+import {
+  getMedicalDisclaimerText,
+  getPrivacyPolicyText,
+  getSupportInfoText,
+} from '@/constants/legal-info';
 import { weekBodyTextStyle, weekButtonTextStyle, weekCardTitleStyle } from '@/constants/typography';
 import { useAppChromeTheme } from '@/hooks/use-app-chrome-theme';
 
@@ -18,6 +25,8 @@ type Props = {
   onClose: () => void;
 };
 
+type LegalDocKey = 'disclaimer' | 'privacy' | 'support' | null;
+
 export function SettingsModal({
   visible,
   language,
@@ -31,6 +40,25 @@ export function SettingsModal({
 }: Props) {
   const insets = useSafeAreaInsets();
   const { modal: theme } = useAppChromeTheme();
+  const [legalDoc, setLegalDoc] = useState<LegalDocKey>(null);
+
+  const legalBody =
+    legalDoc === 'disclaimer'
+      ? getMedicalDisclaimerText(language)
+      : legalDoc === 'privacy'
+        ? getPrivacyPolicyText(language)
+        : legalDoc === 'support'
+          ? getSupportInfoText(language)
+          : '';
+
+  const legalTitle =
+    legalDoc === 'disclaimer'
+      ? labels.medicalDisclaimerTitle
+      : legalDoc === 'privacy'
+        ? labels.privacyPolicyTitle
+        : legalDoc === 'support'
+          ? labels.supportTitle
+          : '';
 
   return (
     <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
@@ -122,6 +150,47 @@ export function SettingsModal({
             </View>
 
             <Pressable
+              onPress={() => setLegalDoc('disclaimer')}
+              accessibilityLabel={labels.medicalDisclaimerTitle}
+              style={({ pressed }) => [
+                styles.linkCard,
+                { backgroundColor: theme.subtlePanelBg, borderColor: theme.subtlePanelBorder },
+                pressed && styles.pressed,
+              ]}>
+              <View style={styles.rowTextWrap}>
+                <Text style={[styles.rowTitle, { color: theme.text }]}>{labels.medicalDisclaimerTitle}</Text>
+                <Text style={[styles.rowHint, { color: theme.textSecondary }]}>{labels.medicalDisclaimerShort}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={theme.iconMuted} />
+            </Pressable>
+
+            <Pressable
+              onPress={() => setLegalDoc('privacy')}
+              accessibilityLabel={labels.privacyPolicyTitle}
+              style={({ pressed }) => [
+                styles.linkRow,
+                { backgroundColor: theme.circleBg, borderColor: theme.circleBorder },
+                pressed && styles.pressed,
+              ]}>
+              <Ionicons name="document-text-outline" size={16} color={theme.icon} />
+              <Text style={[styles.linkRowText, { color: theme.text }]}>{labels.privacyPolicyTitle}</Text>
+              <Ionicons name="chevron-forward" size={16} color={theme.iconMuted} />
+            </Pressable>
+
+            <Pressable
+              onPress={() => setLegalDoc('support')}
+              accessibilityLabel={labels.supportTitle}
+              style={({ pressed }) => [
+                styles.linkRow,
+                { backgroundColor: theme.circleBg, borderColor: theme.circleBorder },
+                pressed && styles.pressed,
+              ]}>
+              <Ionicons name="mail-outline" size={16} color={theme.icon} />
+              <Text style={[styles.linkRowText, { color: theme.text }]}>{labels.supportTitle}</Text>
+              <Ionicons name="chevron-forward" size={16} color={theme.iconMuted} />
+            </Pressable>
+
+            <Pressable
               onPress={onShowOnboardingAgain}
               accessibilityLabel={labels.showOnboardingAgain}
               style={({ pressed }) => [
@@ -135,6 +204,14 @@ export function SettingsModal({
           </ScrollView>
         </View>
       </View>
+
+      <LegalDocModal
+        visible={legalDoc !== null}
+        title={legalTitle}
+        body={legalBody}
+        labels={labels}
+        onClose={() => setLegalDoc(null)}
+      />
     </Modal>
   );
 }
@@ -241,6 +318,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  linkCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  linkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    minHeight: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+  },
+  linkRowText: {
+    ...weekButtonTextStyle,
+    fontSize: 14,
+    flex: 1,
   },
   onboardingBtn: {
     flexDirection: 'row',

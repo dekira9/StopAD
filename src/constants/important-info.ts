@@ -1,4 +1,5 @@
 import type { Language } from '@/constants/i18n';
+import { getMedicalDisclaimerText, isLegalSectionTitle } from '@/constants/legal-info';
 
 const IMPORTANT_INFO_RU = `Тревожное расстройство — это состояние, которое поддерживается сразу несколькими взаимосвязанными факторами. Изменения даже в одном из них постепенно помогают ослабить тревогу.
 
@@ -557,10 +558,14 @@ const IMPORTANT_INFO_SUMMARY_TITLES = new Set([
 ]);
 
 export function getImportantInfoText(language: Language): string {
-  return IMPORTANT_INFO_BY_LANGUAGE[language];
+  return `${getMedicalDisclaimerText(language)}\n\n${IMPORTANT_INFO_BY_LANGUAGE[language]}`;
 }
 
 export function isImportantInfoSectionTitle(paragraph: string): boolean {
   const trimmed = paragraph.trim();
-  return /^[🧠💭🚶❤️]/.test(trimmed) || IMPORTANT_INFO_SUMMARY_TITLES.has(trimmed);
+  return (
+    isLegalSectionTitle(trimmed) ||
+    /^[🧠💭🚶❤️]/.test(trimmed) ||
+    IMPORTANT_INFO_SUMMARY_TITLES.has(trimmed)
+  );
 }
