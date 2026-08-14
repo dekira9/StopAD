@@ -7,10 +7,11 @@
     "icon": "./assets/images/icon.png",
     "scheme": "hianxiety",
     "userInterfaceStyle": "automatic",
-    "backgroundColor": "#F8FAF8",
+    "backgroundColor": "#F5F6FA",
     "ios": {
       "bundleIdentifier": "com.ilyadylko.HiAnxiety",
-      "backgroundColor": "#F8FAF8",
+      "backgroundColor": "#F5F6FA",
+      "icon": "./assets/images/icon.png",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -18,11 +19,16 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundColor": "#6B9080"
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "backgroundColor": "#FFFEFD"
       },
-      "backgroundColor": "#F8FAF8",
+      "backgroundColor": "#F5F6FA",
       "predictiveBackGestureEnabled": false,
       "package": "com.ilyadylko.HiAnxiety"
+    },
+    "web": {
+      "favicon": "./assets/images/favicon.png",
+      "backgroundColor": "#F5F6FA"
     },
     "plugins": [
       "expo-router",
@@ -31,13 +37,14 @@
         {
           "image": "./assets/images/splash-icon.png",
           "resizeMode": "contain",
-          "backgroundColor": "#6B9080"
+          "backgroundColor": "#FFFEFD"
         }
       ],
       [
         "expo-notifications",
         {
-          "color": "#141414"
+          "color": "#141414",
+          "icon": "./assets/images/icon.png"
         }
       ],
       [

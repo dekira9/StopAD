@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { BlurTargetView, BlurView } from 'expo-blur';
 import { addMonths, format, parse } from 'date-fns';
+import { BlurTargetView, BlurView } from 'expo-blur';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -10,7 +10,7 @@ import { MedicationStockEditModal } from '@/components/medication-stock-edit-mod
 import { MedicationStockModal } from '@/components/medication-stock-modal';
 import type { AppLabels } from '@/constants/i18n';
 import { Fonts } from '@/constants/theme';
-import { formatSectionTitle, weekButtonTextStyle, weekDayTitleStyle, weekFieldLabelStyle } from '@/constants/typography';
+import { formatSectionTitle, weekButtonTextStyle, weekDayTitleStyle, weekServiceTextStyle } from '@/constants/typography';
 import { useAppChromeTheme } from '@/hooks/use-app-chrome-theme';
 import {
   formatMedicationLabel,
@@ -19,6 +19,8 @@ import {
 } from '@/stores/wellness-store';
 
 const HEADER_HEIGHT = 48;
+
+type CatalogListTab = 'current' | 'completed';
 
 type AllMedicationsLabels = AppLabels & {
   allMedicationsCurrent: string;
@@ -53,10 +55,18 @@ function AllMedicationsModalShell({
 }: ShellProps) {
   const { modal: theme, isDark } = useAppChromeTheme();
   const blurTargetRef = useRef<View | null>(null);
-  const [entries, setEntries] = useState<MedicationCatalogEntry[]>(loadVisibleMedicationEntries);
-  const [stockTarget, setStockTarget] = useState<MedicationCatalogEntry | null>(null);
-  const [showStockEdit, setShowStockEdit] = useState(false);
+  const [initialState] = useState(() => {
+    const initialEntries = loadVisibleMedicationEntries();
+    const initialStockTarget = initialStockCatalogId
+      ? initialEntries.find((entry) => entry.id === initialStockCatalogId) ?? null
+      : null;
+    return { entries: initialEntries, stockTarget: initialStockTarget };
+  });
+  const [entries, setEntries] = useState<MedicationCatalogEntry[]>(initialState.entries);
+  const [stockTarget, setStockTarget] = useState<MedicationCatalogEntry | null>(initialState.stockTarget);
+  const [showStockEdit, setShowStockEdit] = useState(initialState.stockTarget !== null);
   const [showRefillReminder, setShowRefillReminder] = useState(false);
+  const [listTab, setListTab] = useState<CatalogListTab>('current');
 
   const loadEntries = useCallback(() => {
     setEntries(loadVisibleMedicationEntries());
@@ -64,13 +74,6 @@ function AllMedicationsModalShell({
 
   useEffect(() => {
     if (!initialStockCatalogId) return;
-    const nextEntries = loadVisibleMedicationEntries();
-    setEntries(nextEntries);
-    const entry = nextEntries.find((item) => item.id === initialStockCatalogId);
-    if (entry) {
-      setStockTarget(entry);
-      setShowStockEdit(true);
-    }
     onInitialStockHandled?.();
   }, [initialStockCatalogId, onInitialStockHandled]);
 
@@ -113,6 +116,8 @@ function AllMedicationsModalShell({
 
     return { currentEntries: current, completedEntries: completed };
   }, [entries]);
+
+  const visibleEntries = listTab === 'current' ? currentEntries : completedEntries;
 
   const renderEntry = (entry: MedicationCatalogEntry) => {
     const label = catalogEntryMedicationLabel(entry);
@@ -168,7 +173,7 @@ function AllMedicationsModalShell({
               { borderColor: theme.inactiveBorder },
               pressed && styles.pressed,
             ]}>
-            <ScheduleIcon size={18} color={theme.text} />
+            <ScheduleIcon size={22} color={theme.text} />
             <Text style={[styles.actionBtnText, { color: theme.inactiveText }]}>
               {formatSectionTitle(labels.medicationScheduleButton)}
             </Text>
@@ -181,7 +186,7 @@ function AllMedicationsModalShell({
               { borderColor: theme.inactiveBorder },
               pressed && styles.pressed,
             ]}>
-            <MedicineBottleIcon size={18} color={theme.text} />
+            <MedicineBottleIcon size={22} color={theme.text} />
             <Text style={[styles.actionBtnText, { color: theme.inactiveText }]}>
               {formatSectionTitle(labels.medicationStockAndRefillButton)}
             </Text>
@@ -226,22 +231,57 @@ function AllMedicationsModalShell({
                     </Text>
                   ) : (
                     <>
-                      {currentEntries.length > 0 ? (
-                        <View style={styles.section}>
-                          <Text style={[styles.sectionTitle, { color: theme.activeBg }]}>
-                            {labels.allMedicationsCurrent}
-                          </Text>
-                          {currentEntries.map(renderEntry)}
-                        </View>
-                      ) : null}
-                      {completedEntries.length > 0 ? (
-                        <View style={styles.section}>
-                          <Text style={[styles.sectionTitle, { color: theme.activeBg }]}>
-                            {labels.allMedicationsCompleted}
-                          </Text>
-                          {completedEntries.map(renderEntry)}
-                        </View>
-                      ) : null}
+                      <View
+                        style={[
+                          styles.listTabs,
+                          {
+                            backgroundColor: theme.sectionLabelBg,
+                          },
+                        ]}>
+                        {(
+                          [
+                            { id: 'current' as const, label: labels.allMedicationsCurrent },
+                            { id: 'completed' as const, label: labels.allMedicationsCompleted },
+                          ] as const
+                        ).map((tab) => {
+                          const active = listTab === tab.id;
+                          return (
+                            <Pressable
+                              key={tab.id}
+                              onPress={() => setListTab(tab.id)}
+                              accessibilityRole="tab"
+                              accessibilityState={{ selected: active }}
+                              style={({ pressed }) => [
+                                styles.listTabBtn,
+                                active && [
+                                  styles.listTabBtnActive,
+                                  {
+                                    backgroundColor: '#8A9BD2',
+                                    shadowOpacity: isDark ? 0.25 : 0.08,
+                                  },
+                                ],
+                                pressed && styles.pressed,
+                              ]}>
+                              <Text
+                                style={[
+                                  styles.listTabLabel,
+                                  { color: active ? '#FFFFFF' : theme.textSecondary },
+                                ]}
+                                numberOfLines={1}>
+                                {tab.label}
+                              </Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+
+                      {visibleEntries.length === 0 ? (
+                        <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+                          {labels.allMedicationsEmpty}
+                        </Text>
+                      ) : (
+                        <View style={styles.section}>{visibleEntries.map(renderEntry)}</View>
+                      )}
                     </>
                   )}
                 </ScrollView>
@@ -256,7 +296,7 @@ function AllMedicationsModalShell({
                 <View
                   style={[
                     styles.headerGlassTint,
-                    { backgroundColor: isDark ? 'rgba(21,28,24,0.90)' : 'rgba(255,255,255,0.90)' },
+                    { backgroundColor: isDark ? 'rgba(22,26,38,0.90)' : 'rgba(255,255,255,0.90)' },
                   ]}
                 />
                 <View style={styles.headerRow}>
@@ -264,12 +304,7 @@ function AllMedicationsModalShell({
                   <Text style={[styles.title, { color: theme.text }]}>
                     {formatSectionTitle(labels.allMedicationsTitle)}
                   </Text>
-                  <Pressable
-                    onPress={onClose}
-                    hitSlop={8}
-                    style={({ pressed }) => [styles.headerBtn, pressed && styles.pressed]}>
-                    <Ionicons name="close" size={20} color={theme.text} />
-                  </Pressable>
+                  <View style={styles.headerBtn} />
                 </View>
               </BlurView>
 
@@ -285,7 +320,13 @@ function AllMedicationsModalShell({
                     },
                     pressed && styles.pressed,
                   ]}>
-                  <Ionicons name="add-circle-outline" size={16} color={theme.activeBg} />
+                  <View
+                    style={[
+                      styles.addIconCircle,
+                      { backgroundColor: theme.inactiveBg, borderColor: theme.activeBg },
+                    ]}>
+                    <Ionicons name="add" size={16} color={theme.activeBg} />
+                  </View>
                   <Text style={[styles.addButtonText, { color: theme.activeBg }]}>{labels.addMedication}</Text>
                 </Pressable>
                 <Pressable
@@ -299,6 +340,7 @@ function AllMedicationsModalShell({
                     },
                     pressed && styles.pressed,
                   ]}>
+                  <Ionicons name="checkmark-circle" size={20} color={theme.activeText} />
                   <Text style={[styles.doneButtonText, { color: theme.activeText }]}>{labels.done}</Text>
                 </Pressable>
               </View>
@@ -312,12 +354,29 @@ function AllMedicationsModalShell({
         labels={labels}
         initialRemaining={stockTarget?.stockCount}
         initialPackageSize={stockTarget?.packageSize}
+        initialLastRefillCount={stockTarget?.lastRefillCount}
+        initialLastRefillDateKey={stockTarget?.lastRefillDateKey}
         onClose={() => setShowStockEdit(false)}
-        onSave={({ stockCount, packageSize }) => {
+        onSave={({ stockCount, packageSize, lastRefillCount, lastRefillDateKey }) => {
           if (!stockTarget) return;
-          wellnessStore.updateMedicationCatalogEntry(stockTarget.id, { stockCount, packageSize });
+          wellnessStore.updateMedicationCatalogEntry(stockTarget.id, {
+            ...(stockCount !== undefined ? { stockCount } : {}),
+            ...(packageSize !== undefined ? { packageSize } : {}),
+            ...(lastRefillCount !== undefined ? { lastRefillCount } : {}),
+            ...(lastRefillDateKey !== undefined ? { lastRefillDateKey } : {}),
+          });
           loadEntries();
-          setStockTarget((current) => (current ? { ...current, stockCount, packageSize } : current));
+          setStockTarget((current) =>
+            current
+              ? {
+                  ...current,
+                  ...(stockCount !== undefined ? { stockCount } : {}),
+                  ...(packageSize !== undefined ? { packageSize } : {}),
+                  ...(lastRefillCount !== undefined ? { lastRefillCount } : {}),
+                  ...(lastRefillDateKey !== undefined ? { lastRefillDateKey } : {}),
+                }
+              : current,
+          );
           setShowStockEdit(false);
         }}
       />
@@ -375,7 +434,7 @@ export function catalogEntryMedicationLabel(entry: MedicationCatalogEntry): stri
 const styles = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'flex-end' },
   card: {
-    maxHeight: '88%',
+    height: '88%',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     borderWidth: 1,
@@ -395,7 +454,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   headerGlassTint: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
   },
   headerRow: {
     flexDirection: 'row',
@@ -409,18 +472,50 @@ const styles = StyleSheet.create({
   headerBtn: { minWidth: 28, alignItems: 'flex-end' },
   title: { ...weekDayTitleStyle, textAlign: 'center' },
   blurTarget: {
-    flexGrow: 0,
-    flexShrink: 1,
+    flex: 1,
     minHeight: 0,
   },
   scroll: {
-    flexGrow: 0,
-    flexShrink: 1,
+    flex: 1,
   },
-  scrollContent: { paddingHorizontal: 16, paddingBottom: 8, gap: 14 },
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    gap: 14,
+  },
+  listTabs: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 999,
+    padding: 3,
+    gap: 0,
+  },
+  listTabBtn: {
+    flex: 1,
+    minHeight: 34,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  listTabBtnActive: {
+    shadowColor: '#000',
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 2,
+  },
+  listTabLabel: {
+    ...weekServiceTextStyle,
+    fontSize: 13,
+    letterSpacing: 0.2,
+    textTransform: 'none',
+    fontFamily: Fonts.sansSemiBold,
+    fontWeight: '600',
+  },
   emptyText: { fontSize: 12, textAlign: 'center', paddingVertical: 24 },
   section: { gap: 8 },
-  sectionTitle: { ...weekFieldLabelStyle },
   row: {
     borderWidth: 1,
     borderRadius: 12,
@@ -488,6 +583,14 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
   },
+  addIconCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   addButtonText: {
     fontSize: 12,
     fontWeight: '800',
@@ -495,8 +598,10 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   doneButton: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
     borderRadius: 12,
     borderWidth: 1,
     paddingVertical: 14,

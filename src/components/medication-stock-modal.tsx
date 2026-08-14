@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { MedicineBottleIcon, PillIcon } from '@/components/medical-ui-icons';
@@ -12,6 +13,8 @@ import {
   weekServiceTextStyle,
 } from '@/constants/typography';
 import { useAppChromeTheme } from '@/hooks/use-app-chrome-theme';
+
+const RESERVE_MED_SIZE = 64;
 
 type Props = {
   visible: boolean;
@@ -80,19 +83,14 @@ function MedicationStockModalContent({
       </View>
 
       <View style={styles.content}>
-        <View
-          style={[
-            styles.panel,
-            { backgroundColor: chrome.notesBlockBg, borderColor: chrome.dayBorder },
-          ]}>
-          <View
-            style={[
-              styles.panelHeader,
-              { backgroundColor: theme.sectionLabelBg, borderColor: theme.rowBorder },
-            ]}>
-            <Text style={styles.panelHeaderText}>{formatSectionTitle(labels.medicationName)}</Text>
-          </View>
-          <View style={[styles.identityBody, { backgroundColor: theme.inactiveBg }]}>
+        <View style={[styles.identityBody, { backgroundColor: theme.inactiveBg }]}>
+          <Image
+            source={require('@/assets/images/reservemed.png')}
+            style={styles.reserveMedImage}
+            contentFit="contain"
+            accessibilityIgnoresInvertColors
+          />
+          <View style={styles.identityTextWrap}>
             <Text style={[styles.identityName, { color: chrome.medicationFieldText }]} numberOfLines={2}>
               {medName}
             </Text>
@@ -224,29 +222,33 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: 'hidden',
   },
-  panelHeader: {
+  identityBody: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderBottomWidth: 1,
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 6,
-  },
-  panelHeaderText: {
-    ...dayMedicationsHeaderStyle,
-  },
-  identityBody: {
+    justifyContent: 'center',
+    gap: 12,
+    borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 12,
+  },
+  identityTextWrap: {
+    flexShrink: 1,
     gap: 2,
+    minWidth: 0,
   },
   identityName: {
     ...weekBodyTextStyle,
     fontFamily: Fonts.sansSemiBold,
     fontWeight: '600',
+    textAlign: 'center',
   },
   identityDose: {
     ...weekServiceTextStyle,
+    textAlign: 'center',
+  },
+  reserveMedImage: {
+    width: RESERVE_MED_SIZE,
+    height: RESERVE_MED_SIZE,
   },
   sheetRow: {
     flexDirection: 'row',

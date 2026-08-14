@@ -50,16 +50,6 @@ export function PanicAttackModal({ visible, labels, onClose }: Props) {
             </Text>
             <Text style={[styles.bodyText, { color: theme.text }]}>{labels.panicAttackGrounding}</Text>
           </ScrollView>
-
-          <Pressable
-            onPress={onClose}
-            style={({ pressed }) => [
-              styles.doneButton,
-              { backgroundColor: theme.activeBg, borderColor: theme.activeBg },
-              pressed && styles.pressed,
-            ]}>
-            <Text style={[styles.doneButtonText, { color: theme.activeText }]}>{labels.done}</Text>
-          </Pressable>
         </View>
       </View>
     </Modal>
@@ -143,20 +133,6 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     marginTop: 8,
     marginBottom: 4,
-  },
-  doneButton: {
-    marginTop: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingVertical: 14,
-  },
-  doneButtonText: {
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
   },
   pressed: {
     opacity: 0.85,

@@ -1,8 +1,9 @@
-import type { DayLog } from '@/stores/wellness-store';
+type PanicAttackDayLike = {
+  panicAttackCount?: number;
+  panicAttack?: 'yes' | 'no';
+};
 
-type LegacyDayLog = DayLog & { panicAttack?: 'yes' | 'no' };
-
-export function resolvePanicAttackCount(day: LegacyDayLog | undefined): number {
+export function resolvePanicAttackCount(day: PanicAttackDayLike | undefined): number {
   if (!day) return 0;
   if (typeof day.panicAttackCount === 'number') {
     return Math.max(0, Math.floor(day.panicAttackCount));

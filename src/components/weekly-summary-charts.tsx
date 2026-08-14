@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { addDays, format, isWithinInterval, startOfDay } from 'date-fns';
 import type { Locale } from 'date-fns';
 
 import type { AppLabels, Language } from '@/constants/i18n';
@@ -7,10 +8,15 @@ import { Fonts } from '@/constants/theme';
 import type { DayLog } from '@/stores/wellness-store';
 import { formatSleepClock } from '@/utils/sleep-log';
 import {
+  buildWeekFactLines,
+  buildWeekFacts,
   buildWeeklySummaryEntries,
   buildWeeklyTriggerCounts,
+  compareWeekFacts,
   formatWeeklyTriggerLine,
   getWeeklySummaryMaxPanic,
+  sliceWeeklyEntriesThroughDate,
+  sliceWeeklyEntriesByCount,
   type WeeklySummaryDayEntry,
 } from '@/utils/weekly-summary-data';
 
@@ -128,11 +134,43 @@ export function WeeklySummaryCharts({ weekDays, days, labels, locale, language, 
     [weekDays, days, locale, language],
   );
 
+  const previousWeekDays = useMemo(() => weekDays.map((day) => addDays(day, -7)), [weekDays]);
+
+  const previousEntries = useMemo(
+    () => buildWeeklySummaryEntries(previousWeekDays, days, locale, language),
+    [previousWeekDays, days, locale, language],
+  );
+
+  const throughDateKey = useMemo(() => {
+    if (weekDays.length === 0) return null;
+    const today = startOfDay(new Date());
+    const start = startOfDay(weekDays[0]);
+    const end = startOfDay(weekDays[weekDays.length - 1]);
+    if (!isWithinInterval(today, { start, end })) return null;
+    return format(today, 'yyyy-MM-dd');
+  }, [weekDays]);
+
+  const factLines = useMemo(() => {
+    const currentSlice = sliceWeeklyEntriesThroughDate(entries, throughDateKey);
+    const previousSlice = sliceWeeklyEntriesByCount(previousEntries, throughDateKey ? currentSlice.length : null);
+    const compare = compareWeekFacts(buildWeekFacts(currentSlice), buildWeekFacts(previousSlice));
+    return buildWeekFactLines(compare, labels);
+  }, [entries, previousEntries, throughDateKey, labels]);
+
   const maxPanic = useMemo(() => getWeeklySummaryMaxPanic(entries), [entries]);
   const triggerCounts = useMemo(() => buildWeeklyTriggerCounts(entries, language), [entries, language]);
 
   return (
     <View style={styles.wrap}>
+    <View style={[styles.factsBlock, { backgroundColor: theme.panelBg, borderColor: theme.borderColor }]}>
+      <Text style={[styles.factsTitle, { color: theme.text }]}>{labels.weeklyFactsTitle}</Text>
+      {factLines.map((line, index) => (
+        <Text key={`${index}-${line}`} style={[styles.factsLine, { color: theme.text }]}>
+          {line}
+        </Text>
+      ))}
+    </View>
+
     <View style={[styles.table, { backgroundColor: theme.panelBg, borderColor: theme.borderColor }]}>
       <View style={[styles.tableRow, styles.headerRow, { borderColor: theme.borderColor }]}>
         <View style={styles.labelCell} />
@@ -226,6 +264,24 @@ const styles = StyleSheet.create({
   wrap: {
     gap: 10,
     marginBottom: 14,
+  },
+  factsBlock: {
+    width: '100%',
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  factsTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    marginBottom: 6,
+    fontFamily: Fonts.rounded,
+  },
+  factsLine: {
+    fontSize: 12,
+    lineHeight: 18,
+    marginBottom: 2,
   },
   table: {
     width: '100%',

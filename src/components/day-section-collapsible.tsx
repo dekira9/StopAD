@@ -22,6 +22,7 @@ type Props = {
   children: ReactNode;
   variant?: 'card' | 'pill';
   shadowOpacity?: number;
+  icon?: ReactNode;
 };
 
 export function DaySectionCollapsible({
@@ -34,6 +35,7 @@ export function DaySectionCollapsible({
   children,
   variant = 'card',
   shadowOpacity,
+  icon,
 }: Props) {
   const collapsedLabel = summary?.trim() || emptyHint?.trim() || '';
   const isHintOnly = !summary?.trim() && !!emptyHint?.trim();
@@ -50,6 +52,7 @@ export function DaySectionCollapsible({
       {isPill ? (
         <Ionicons name="ellipsis-horizontal" size={16} color={theme.iconMuted} />
       ) : null}
+      {icon ? <View style={styles.leadingIcon}>{icon}</View> : null}
       <Text style={styles.title} numberOfLines={1}>
         {title}
       </Text>
@@ -131,6 +134,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     borderRadius: 999,
+  },
+  leadingIcon: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   title: {
     ...daySectionLabelStyle,

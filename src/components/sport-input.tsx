@@ -1,9 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
-import { useMemo } from 'react';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useMemo, type ComponentProps } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import type { AppLabels } from '@/constants/i18n';
-import { formatSectionTitle, daySectionLabelStyle, weekBodyTextStyle, weekServiceTextStyle } from '@/constants/typography';
+import { formatSectionTitle, daySectionLabelStyle, weekBodyTextStyle, weekButtonTextStyle, weekServiceTextStyle } from '@/constants/typography';
 import {
   createSportActivity,
   formatSportDuration,
@@ -15,6 +15,22 @@ import {
   type SportActivityType,
   type SportLog,
 } from '@/utils/sport-log';
+
+const SPORT = {
+  accent: '#4A7D68',
+  buttonBorder: '#8FB5A3',
+  buttonBg: '#E3F1E8',
+  selectedBg: '#E8F0EA',
+} as const;
+
+const SPORT_ACTIVITY_ICONS: Record<SportActivityType, ComponentProps<typeof MaterialCommunityIcons>['name']> = {
+  walking: 'walk',
+  running: 'run',
+  strength: 'dumbbell',
+  gymnastics: 'gymnastics',
+  stretching: 'yoga',
+  other: 'dots-horizontal',
+};
 
 type ThemeSlice = {
   text: string;
@@ -101,6 +117,7 @@ export function SportInput({ label, value, labels, theme, onChange, hideLabel }:
           {SPORT_ACTIVITY_TYPES.map((type: SportActivityType) => {
             const selected = activity.type === type;
             const typeLabel = labels[SPORT_ACTIVITY_LABEL_KEYS[type] as keyof AppLabels];
+            const chipColor = selected ? SPORT.accent : theme.text;
             return (
               <Pressable
                 key={type}
@@ -114,17 +131,13 @@ export function SportInput({ label, value, labels, theme, onChange, hideLabel }:
                 style={({ pressed }) => [
                   styles.typeChip,
                   {
-                    borderColor: selected ? theme.activeBg : theme.inactiveBorder,
-                    backgroundColor: selected ? theme.activeBg : theme.inactiveBg,
+                    borderColor: selected ? SPORT.buttonBorder : theme.inactiveBorder,
+                    backgroundColor: selected ? SPORT.selectedBg : '#FFFFFF',
                   },
                   pressed && styles.pressed,
                 ]}>
-                <Text
-                  style={[
-                    styles.typeChipText,
-                    { color: selected ? theme.activeText : theme.inactiveText },
-                  ]}
-                  numberOfLines={2}>
+                <MaterialCommunityIcons name={SPORT_ACTIVITY_ICONS[type]} size={16} color={chipColor} />
+                <Text style={[styles.typeChipText, { color: chipColor }]} numberOfLines={1}>
                   {typeLabel}
                 </Text>
               </Pressable>
@@ -138,7 +151,10 @@ export function SportInput({ label, value, labels, theme, onChange, hideLabel }:
             onChangeText={(text) => updateActivity(activity.id, { otherNote: text })}
             placeholder={labels.sportOtherPlaceholder}
             placeholderTextColor={theme.textSecondary}
-            style={[styles.otherInput, { color: theme.text, borderColor: theme.inactiveBorder }]}
+            style={[
+              styles.otherInput,
+              { color: theme.text, borderColor: theme.inactiveBorder, backgroundColor: '#FFFFFF' },
+            ]}
           />
         ) : null}
 
@@ -211,12 +227,14 @@ export function SportInput({ label, value, labels, theme, onChange, hideLabel }:
           onPress={addActivity}
           style={({ pressed }) => [
             styles.addButton,
-            { borderColor: theme.inactiveBorder, backgroundColor: theme.inactiveBg },
+            { borderColor: SPORT.buttonBorder, backgroundColor: SPORT.selectedBg },
             pressed && styles.pressed,
           ]}>
-          <Ionicons name="add-circle-outline" size={16} color={theme.activeBg} />
-          <Text style={[styles.addButtonText, { color: theme.activeBg }]}>
-            {labels.sportAddActivity.toLocaleLowerCase()}
+          <View style={[styles.addIconCircle, { backgroundColor: SPORT.buttonBg, borderColor: SPORT.buttonBorder }]}>
+            <Ionicons name="add" size={16} color={SPORT.accent} />
+          </View>
+          <Text style={[styles.addButtonText, { color: SPORT.accent }]}>
+            {labels.sportAddActivity}
           </Text>
         </Pressable>
       </View>
@@ -244,6 +262,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 10,
     gap: 8,
+    shadowColor: '#4A7D68',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 2,
   },
   activityHeader: {
     flexDirection: 'row',
@@ -262,22 +285,25 @@ const styles = StyleSheet.create({
   typeGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
+    gap: 8,
   },
   typeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
     borderWidth: 1,
-    borderRadius: 10,
+    borderRadius: 999,
     paddingHorizontal: 8,
-    paddingVertical: 7,
-    minWidth: '30%',
+    paddingVertical: 9,
+    width: '31.5%',
     flexGrow: 1,
-    maxWidth: '48%',
   },
   typeChipText: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '500',
     textAlign: 'center',
-    lineHeight: 17,
+    lineHeight: 14,
   },
   fieldLabel: {
     ...weekServiceTextStyle,
@@ -326,14 +352,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    borderWidth: 1,
-    borderRadius: 10,
+    gap: 8,
+    borderWidth: 1.5,
+    borderRadius: 12,
     paddingVertical: 8,
     paddingHorizontal: 10,
   },
+  addIconCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   addButtonText: {
-    ...weekBodyTextStyle,
+    ...weekButtonTextStyle,
   },
   pressed: { opacity: 0.7 },
 });

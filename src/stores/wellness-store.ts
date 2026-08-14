@@ -49,14 +49,36 @@ export type MedicationCatalogEntry = {
   refillReminderEnabled?: boolean;
   /** Number of pills in one package. */
   packageSize?: number;
+  /** Last refill amount entered in the stock screen. */
+  lastRefillCount?: number;
+  /** Date key (yyyy-MM-dd) of the last refill. */
+  lastRefillDateKey?: string;
   /**
-   * Bumped when package size is manually changed.
-   * Kept for compatibility; pack progress no longer resets on stock refill.
+   * Blister offset for a partial opening pack.
+   * First take after stock setup shows (packOffset % packageSize) + 1 as x in x/y.
+   * Example: 5 left in a 28-pack → packOffset 23 → first take is 24/28.
+   */
+  packOffset?: number;
+  /**
+   * Bumped when package size or stock is manually changed.
+   * Taken rows store this so pack numbering restarts from the new stock setup.
    */
   stockCycleVersion?: number;
   /** Manually added via catalog; shown until schedule is saved or entry is removed. */
   isDraft?: boolean;
 };
+
+/** Offset so a leftover pack continues blister numbering instead of restarting at 1. */
+export function computeMedicationPackOffset(
+  stockCount: number | undefined,
+  packageSize: number | undefined,
+): number | undefined {
+  if (typeof packageSize !== 'number' || packageSize <= 0) return undefined;
+  if (typeof stockCount !== 'number' || stockCount <= 0) return 0;
+  const partialLeft = stockCount % packageSize;
+  if (partialLeft === 0) return 0;
+  return packageSize - partialLeft;
+}
 
 export function parseMedicationLabel(medication: string): { name: string; dose: string } {
   const trimmed = medication.trim();
@@ -227,7 +249,10 @@ function medicationMatches(
   row: Pick<MedicationRow, 'time' | 'medication'>,
   template: Pick<MedicationRow, 'time' | 'medication'>,
 ) {
-  return row.medication.trim() === template.medication.trim() && (row.time ?? '').trim() === (template.time ?? '').trim();
+  return (
+    medicationLabelsEqual(row.medication, template.medication) &&
+    medicationTimesEqual(row.time ?? '', template.time ?? '')
+  );
 }
 
 function normalizeMedicationTime(time: string): string {
@@ -271,17 +296,6 @@ function ensureMinimumMedicationRows(dateKey: string, meds: MedicationRow[]): Me
     });
   }
   return padded;
-}
-
-function defaultMedicationRows(dateKey: string, count = DEFAULT_MEDICATION_ROWS): MedicationRow[] {
-  if (count <= 0) return [];
-  return Array.from({ length: count }).map((_, idx) => ({
-    id: generateSafeId(dateKey, idx, []),
-    time: '',
-    medication: '',
-    taken: false,
-    reminderEnabled: true,
-  }));
 }
 
 function getNativeFileUri(): string | null {
@@ -466,6 +480,7 @@ class WellnessStore {
           } else {
             this.pruneMedicationCatalog();
           }
+          this.normalizeMedicationCatalogPackOffsets();
         }
         this.hydrated = true;
       });
@@ -563,11 +578,10 @@ class WellnessStore {
     const medName = row.medication.trim();
     if (!medName || !row.taken) return null;
 
+    const catalogEntry = this.findMedicationCatalogEntry(medName);
     const packageSize = this.getMedicationPackageSize(medName);
-    if (!packageSize) return null;
-
-    // Count actual taken pills for this medication (refill must not reset n/size).
-    return this.getMedicationPackageCycleIntakeNumber(dateKey, row, packageSize);
+    // Without package size: show total taken doses. With size: n within the pack cycle.
+    return this.getMedicationPackageCycleIntakeNumber(dateKey, row, packageSize, catalogEntry);
   }
 
   getMedicationPackageSizeForName(medicationName: string): number | undefined {
@@ -593,12 +607,21 @@ class WellnessStore {
   private getMedicationPackageCycleIntakeNumber(
     dateKey: string,
     row: MedicationRow,
-    packageSize: number,
+    packageSize?: number,
+    catalogEntry?: MedicationCatalogEntry,
   ): number | null {
     const medName = row.medication.trim();
     if (!medName) return null;
 
     const targetName = medName.toLowerCase();
+    const rowCycle = row.stockCycleVersion ?? 0;
+    const catalogCycle = catalogEntry?.stockCycleVersion ?? 0;
+    const packOffset =
+      rowCycle === catalogCycle &&
+      typeof catalogEntry?.packOffset === 'number' &&
+      catalogEntry.packOffset >= 0
+        ? catalogEntry.packOffset
+        : 0;
     let count = 0;
 
     for (const currentKey of Object.keys(this.days).sort()) {
@@ -608,10 +631,12 @@ class WellnessStore {
       for (const medicationRow of currentDay.medications) {
         if (!medicationRow.taken) continue;
         if (medicationRow.medication.trim().toLowerCase() !== targetName) continue;
+        if ((medicationRow.stockCycleVersion ?? 0) !== rowCycle) continue;
 
         count += 1;
         if (currentKey === dateKey && medicationRow.id === row.id) {
-          return ((count - 1) % packageSize) + 1;
+          if (!packageSize) return count;
+          return ((packOffset + count - 1) % packageSize) + 1;
         }
       }
     }
@@ -744,7 +769,7 @@ class WellnessStore {
 
     for (const [weekKey, plan] of Object.entries(nextPlans)) {
       if (weekKey === keepWeekKey) continue;
-      const filtered = plan.filter((template) => template.medication.trim() !== trimmedName);
+      const filtered = plan.filter((template) => !medicationLabelsEqual(template.medication, trimmedName));
       if (filtered.length === plan.length) continue;
       nextPlans[weekKey] = filtered.map((entry) => ({
         ...entry,
@@ -811,6 +836,8 @@ class WellnessStore {
     if (entry.isDraft) return true;
     const label = formatMedicationLabel(entry.name, entry.dose).trim();
     if (!label) return true;
+    // Keep stocked entries even if temporarily unlinked (e.g. mid-rename), so stock/package survive.
+    if (typeof entry.stockCount === 'number' || typeof entry.packageSize === 'number') return true;
     return this.hasMedicationSchedule(label) || this.hasMedicationInDays(label);
   }
 
@@ -866,6 +893,30 @@ class WellnessStore {
       this.medicationCatalog = next;
       this.schedulePersist();
     }
+  }
+
+  /** Fill missing packOffset for older saves and restart numbering for the new model. */
+  private normalizeMedicationCatalogPackOffsets() {
+    let changed = false;
+    const next = this.medicationCatalog.map((entry) => {
+      const hasPackage = typeof entry.packageSize === 'number' && entry.packageSize > 0;
+      if (!hasPackage) {
+        if (entry.packOffset === undefined) return entry;
+        changed = true;
+        const { packOffset: _removed, ...rest } = entry;
+        return rest;
+      }
+      if (typeof entry.packOffset === 'number') return entry;
+      changed = true;
+      return {
+        ...entry,
+        packOffset: computeMedicationPackOffset(entry.stockCount, entry.packageSize) ?? 0,
+        stockCycleVersion: (entry.stockCycleVersion ?? 0) + 1,
+      };
+    });
+    if (!changed) return;
+    this.medicationCatalog = next;
+    this.schedulePersist();
   }
 
   private collectMedicationsFromData(): MedicationCatalogEntry[] {
@@ -946,30 +997,68 @@ class WellnessStore {
 
   updateMedicationCatalogEntry(
     id: string,
-    patch: Partial<
-      Pick<
-        MedicationCatalogEntry,
-        'name' | 'dose' | 'stockCount' | 'refillReminderCount' | 'refillReminderEnabled' | 'packageSize'
-      >
-    >,
+    patch: Partial<{
+      name: string;
+      dose: string;
+      stockCount: number;
+      /** Pass `null` to clear the stored threshold. */
+      refillReminderCount: number | null;
+      refillReminderEnabled: boolean;
+      packageSize: number;
+      lastRefillCount: number;
+      lastRefillDateKey: string;
+    }>,
   ) {
     const index = this.medicationCatalog.findIndex((entry) => entry.id === id);
     if (index < 0) return;
 
     const current = this.medicationCatalog[index];
     const oldLabel = formatMedicationLabel(current.name, current.dose);
+    // Do not persist empty names mid-edit — that orphans day history and stock under the old label.
+    if (typeof patch.name === 'string' && !patch.name.trim()) {
+      const { name: _ignoredName, ...rest } = patch;
+      patch = rest;
+    }
+    const clearRefillReminderCount = patch.refillReminderCount === null;
     const cleanedPatch = Object.fromEntries(
-      Object.entries(patch).filter(([, value]) => value !== undefined),
-    ) as typeof patch;
-    const shouldRestartPackageCycle =
-      cleanedPatch.packageSize !== undefined && cleanedPatch.packageSize !== current.packageSize;
-    const next = {
+      Object.entries(patch).filter(([, value]) => value !== undefined && value !== null),
+    ) as Partial<
+      Pick<
+        MedicationCatalogEntry,
+        | 'name'
+        | 'dose'
+        | 'stockCount'
+        | 'refillReminderCount'
+        | 'refillReminderEnabled'
+        | 'packageSize'
+        | 'lastRefillCount'
+        | 'lastRefillDateKey'
+      >
+    >;
+    if (Object.keys(cleanedPatch).length === 0 && !clearRefillReminderCount) return;
+
+    const stockOrPackageChanged =
+      (cleanedPatch.stockCount !== undefined && cleanedPatch.stockCount !== current.stockCount) ||
+      (cleanedPatch.packageSize !== undefined && cleanedPatch.packageSize !== current.packageSize);
+
+    const next: MedicationCatalogEntry = {
       ...current,
       ...cleanedPatch,
-      ...(shouldRestartPackageCycle
-        ? { stockCycleVersion: (current.stockCycleVersion ?? 0) + 1 }
-        : {}),
     };
+
+    if (stockOrPackageChanged) {
+      next.stockCycleVersion = (current.stockCycleVersion ?? 0) + 1;
+      const nextOffset = computeMedicationPackOffset(next.stockCount, next.packageSize);
+      if (nextOffset === undefined) {
+        delete next.packOffset;
+      } else {
+        next.packOffset = nextOffset;
+      }
+    }
+
+    if (clearRefillReminderCount) {
+      delete next.refillReminderCount;
+    }
     const newLabel = formatMedicationLabel(next.name, next.dose);
 
     this.medicationCatalog = this.medicationCatalog.map((entry) =>
@@ -989,12 +1078,45 @@ class WellnessStore {
     if (!trimmedOld || !trimmedNew || medicationLabelsEqual(trimmedOld, trimmedNew)) return;
 
     const { name, dose } = parseMedicationLabel(trimmedNew);
-    const hasExistingTarget = this.medicationCatalog.some((entry) => {
+    const targetIndex = this.medicationCatalog.findIndex((entry) => {
       const label = formatMedicationLabel(entry.name, entry.dose);
       return medicationLabelsEqual(label, trimmedNew) && !medicationLabelsEqual(label, trimmedOld);
     });
-    let renamed = false;
+    const source = this.medicationCatalog.find((entry) =>
+      medicationLabelsEqual(formatMedicationLabel(entry.name, entry.dose), trimmedOld),
+    );
 
+    if (targetIndex >= 0 && source) {
+      // Merge into existing target so stock/package are not discarded on name collision.
+      const target = this.medicationCatalog[targetIndex];
+      const merged: MedicationCatalogEntry = {
+        ...target,
+        name,
+        dose,
+        isDraft: false,
+        stockCount:
+          typeof source.stockCount === 'number'
+            ? typeof target.stockCount === 'number'
+              ? Math.max(target.stockCount, source.stockCount)
+              : source.stockCount
+            : target.stockCount,
+        packageSize: target.packageSize ?? source.packageSize,
+        packOffset: target.packOffset ?? source.packOffset,
+        lastRefillCount: target.lastRefillCount ?? source.lastRefillCount,
+        lastRefillDateKey: target.lastRefillDateKey ?? source.lastRefillDateKey,
+        refillReminderCount: target.refillReminderCount ?? source.refillReminderCount,
+        refillReminderEnabled: target.refillReminderEnabled ?? source.refillReminderEnabled,
+        stockCycleVersion: Math.max(target.stockCycleVersion ?? 0, source.stockCycleVersion ?? 0),
+      };
+      this.medicationCatalog = this.medicationCatalog
+        .filter((entry) => !medicationLabelsEqual(formatMedicationLabel(entry.name, entry.dose), trimmedOld))
+        .map((entry) =>
+          medicationLabelsEqual(formatMedicationLabel(entry.name, entry.dose), trimmedNew) ? merged : entry,
+        );
+      return;
+    }
+
+    let renamed = false;
     this.medicationCatalog = this.medicationCatalog.reduce<MedicationCatalogEntry[]>((nextEntries, entry) => {
       const label = formatMedicationLabel(entry.name, entry.dose);
       if (!medicationLabelsEqual(label, trimmedOld)) {
@@ -1002,7 +1124,7 @@ class WellnessStore {
         return nextEntries;
       }
 
-      if (hasExistingTarget || renamed) {
+      if (renamed) {
         return nextEntries;
       }
 
@@ -1011,13 +1133,25 @@ class WellnessStore {
       return nextEntries;
     }, []);
 
-    if (!renamed && !hasExistingTarget) {
+    if (!renamed) {
       this.medicationCatalog = [
         ...this.medicationCatalog,
         {
           id: `med-catalog-${Date.now()}-${this.medicationCatalog.length}`,
           name,
           dose,
+          ...(source
+            ? {
+                stockCount: source.stockCount,
+                packageSize: source.packageSize,
+                packOffset: source.packOffset,
+                lastRefillCount: source.lastRefillCount,
+                lastRefillDateKey: source.lastRefillDateKey,
+                refillReminderCount: source.refillReminderCount,
+                refillReminderEnabled: source.refillReminderEnabled,
+                stockCycleVersion: source.stockCycleVersion,
+              }
+            : {}),
         },
       ];
     }
@@ -1158,13 +1292,15 @@ class WellnessStore {
     if ('medication' in patch) {
       const nextLabel = (patch.medication ?? '').trim();
       const previousTrimmed = previousLabel.trim();
-      if (previousTrimmed && nextLabel && !medicationLabelsEqual(previousTrimmed, nextLabel)) {
+      if (!nextLabel) {
+        // Ignore empty mid-edit clears so history/stock stay attached to the previous label.
+        meds[rowIndex] = { ...meds[rowIndex], medication: previousLabel };
+        this.days = { ...this.days, [dateKey]: { ...day, medications: meds } };
+      } else if (previousTrimmed && !medicationLabelsEqual(previousTrimmed, nextLabel)) {
         this.renameMedicationLabel(previousTrimmed, nextLabel, true);
-      } else if (nextLabel) {
-        this.ensureCatalogEntryForMedication(nextLabel);
-      }
-      if (previousTrimmed && (!nextLabel || !medicationLabelsEqual(previousTrimmed, nextLabel))) {
         this.pruneMedicationCatalog();
+      } else {
+        this.ensureCatalogEntryForMedication(nextLabel);
       }
     }
 
@@ -1193,6 +1329,27 @@ class WellnessStore {
       itemIndex === index ? { ...item, stockCount: nextCount } : item,
     );
     return true;
+  }
+
+  /** Refund catalog stock when a taken row is removed outside setMedicationStatus. */
+  private refundStockForRemovedRow(row: MedicationRow) {
+    if (!row.taken || row.stockDeducted !== true) return;
+    this.adjustMedicationStock(row.medication, 1);
+  }
+
+  private copyIntakeState(existing?: MedicationRow): Pick<
+    MedicationRow,
+    'taken' | 'skipped' | 'takenAt' | 'stockCycleVersion' | 'stockDeducted'
+  > {
+    const taken = existing?.taken ?? false;
+    return {
+      taken,
+      skipped: existing?.skipped ?? false,
+      takenAt: existing?.takenAt,
+      stockCycleVersion: existing?.stockCycleVersion,
+      // Preserve exact flag only — never invent deductions.
+      stockDeducted: taken ? existing?.stockDeducted : undefined,
+    };
   }
 
   setMedicationStatus(dateKey: string, rowId: string, idx: number, status: 'taken' | 'skipped' | 'cleared') {
@@ -1230,9 +1387,10 @@ class WellnessStore {
 
       let stockDeducted = previous.stockDeducted;
       if (!wasTaken && nextTaken) {
-        stockDeducted = this.adjustMedicationStock(previous.medication, -1) ? true : undefined;
+        // true = deducted, false = take recorded but stock not changed (e.g. stock at 0).
+        stockDeducted = this.adjustMedicationStock(previous.medication, -1) ? true : false;
       } else if (wasTaken && !nextTaken) {
-        if (previous.stockDeducted) {
+        if (previous.stockDeducted === true) {
           this.adjustMedicationStock(previous.medication, 1);
         }
         stockDeducted = undefined;
@@ -1267,7 +1425,10 @@ class WellnessStore {
     if (idx < 0 || idx >= day.medications.length) return;
     if (day.medications.length <= DEFAULT_MEDICATION_ROWS) return;
     const meds = [...day.medications];
-    meds.splice(idx, 1);
+    const [removed] = meds.splice(idx, 1);
+    if (removed) {
+      this.refundStockForRemovedRow(removed);
+    }
     this.days = { ...this.days, [dateKey]: { ...day, medications: meds } };
     this.schedulePersist();
   }
@@ -1343,7 +1504,7 @@ class WellnessStore {
     const nextPlans: Record<string, MedicationPlanTemplate[]> = {};
     for (const [weekKey, plan] of Object.entries(this.weekMedicationPlans)) {
       nextPlans[weekKey] = plan
-        .filter((template) => template.medication.trim() !== trimmedName)
+        .filter((template) => !medicationLabelsEqual(template.medication, trimmedName))
         .map((entry) => ({
           ...entry,
           repeat: { ...entry.repeat, daysOfWeek: [...entry.repeat.daysOfWeek] },
@@ -1353,7 +1514,12 @@ class WellnessStore {
 
     const nextDays: DayLogs = {};
     for (const [dateKey, day] of Object.entries(this.days)) {
-      let meds = day.medications.filter((row) => row.medication.trim() !== trimmedName);
+      for (const row of day.medications) {
+        if (medicationLabelsEqual(row.medication, trimmedName)) {
+          this.refundStockForRemovedRow(row);
+        }
+      }
+      let meds = day.medications.filter((row) => !medicationLabelsEqual(row.medication, trimmedName));
       if (meds.length < DEFAULT_MEDICATION_ROWS) {
         const padCount = DEFAULT_MEDICATION_ROWS - meds.length;
         const emptyRows = Array.from({ length: padCount }).map((_, idx) => ({
@@ -1467,7 +1633,7 @@ class WellnessStore {
     for (const [weekKey, plan] of Object.entries(nextPlans)) {
       let planChanged = false;
       const nextPlan = plan.map((template) => {
-        if (template.medication.trim() !== trimmedName || template.reminderEnabled === enabled) {
+        if (!medicationLabelsEqual(template.medication, trimmedName) || template.reminderEnabled === enabled) {
           return template;
         }
         planChanged = true;
@@ -1490,7 +1656,7 @@ class WellnessStore {
     for (const [dateKey, day] of Object.entries(nextDays)) {
       let dayChanged = false;
       const meds = day.medications.map((row) => {
-        if (row.medication.trim() !== trimmedName || row.reminderEnabled === enabled) {
+        if (!medicationLabelsEqual(row.medication, trimmedName) || row.reminderEnabled === enabled) {
           return row;
         }
         dayChanged = true;
@@ -1580,7 +1746,7 @@ class WellnessStore {
     const nextDays: DayLogs = { ...this.days };
 
     for (const [dateKey, day] of Object.entries(this.days)) {
-      const hasMedication = day.medications.some((row) => row.medication.trim() === trimmedName);
+      const hasMedication = day.medications.some((row) => medicationLabelsEqual(row.medication, trimmedName));
       if (!hasMedication) continue;
 
       const targetDate = parse(dateKey, 'yyyy-MM-dd', new Date());
@@ -1590,9 +1756,14 @@ class WellnessStore {
 
       if (shouldKeep) continue;
 
+      // Drop only unscheduled empty slots. Keep taken/skipped rows so past marks
+      // survive temporary schedule edits (and restore when the schedule is reverted).
       const meds = ensureMinimumMedicationRows(
         dateKey,
-        day.medications.filter((row) => row.medication.trim() !== trimmedName),
+        day.medications.filter((row) => {
+          if (!medicationLabelsEqual(row.medication, trimmedName)) return true;
+          return Boolean(row.taken || row.skipped);
+        }),
       );
       nextDays[dateKey] = { ...day, medications: meds };
     }
@@ -1616,28 +1787,59 @@ class WellnessStore {
     });
 
     if (matching.length === 0) {
+      // Keep historical taken/skipped rows; only clear empty planned slots for plan meds.
+      const planNames = new Set(
+        templates.map((template) => template.medication.trim().toLowerCase()).filter(Boolean),
+      );
+      const kept = day.medications.filter((row) => {
+        const label = row.medication.trim().toLowerCase();
+        if (!planNames.has(label)) return true;
+        if (row.taken || row.skipped) return true;
+        this.refundStockForRemovedRow(row);
+        return false;
+      });
       this.days = {
         ...this.days,
-        [dateKey]: { ...day, medications: defaultMedicationRows(dateKey) },
+        [dateKey]: { ...day, medications: ensureMinimumMedicationRows(dateKey, kept) },
       };
       return;
     }
 
-    const meds = matching.map((template, index) => {
-      const existing = day.medications.find((row) => medicationMatches(row, template));
+    const usedExistingIds = new Set<string>();
+    const planMeds = matching.map((template, index) => {
+      const existing = day.medications.find(
+        (row) => medicationMatches(row, template) && !usedExistingIds.has(row.id),
+      );
+      if (existing) {
+        usedExistingIds.add(existing.id);
+      }
       return {
         id: existing?.id ?? generateSafeId(dateKey, index, day.medications),
         time: template.time,
         medication: template.medication,
-        taken: existing?.taken ?? false,
-        skipped: existing?.skipped ?? false,
-        takenAt: existing?.takenAt,
         reminderEnabled: template.reminderEnabled,
-        stockCycleVersion: existing?.stockCycleVersion,
+        ...this.copyIntakeState(existing),
       };
     });
 
-    this.days = { ...this.days, [dateKey]: { ...day, medications: meds } };
+    const matchingNames = new Set(matching.map((template) => template.medication.trim().toLowerCase()));
+    const otherMeds = day.medications.filter((row) => {
+      if (usedExistingIds.has(row.id)) return false;
+      const label = row.medication.trim().toLowerCase();
+      if (!matchingNames.has(label)) return true;
+      // Unmatched slot for a plan medication — keep history, refund only if dropped later.
+      if (row.taken || row.skipped) return true;
+      this.refundStockForRemovedRow(row);
+      return false;
+    });
+
+    this.days = {
+      ...this.days,
+      [dateKey]: {
+        ...day,
+        medications: ensureMinimumMedicationRows(dateKey, [...planMeds, ...otherMeds]),
+      },
+    };
   }
 
   private syncMedicationRowsForDay(
@@ -1652,25 +1854,57 @@ class WellnessStore {
 
     const medRowIndices: number[] = [];
     meds.forEach((row, index) => {
-      if (row.medication.trim() === medName) {
+      if (medicationLabelsEqual(row.medication, medName)) {
         medRowIndices.push(index);
       }
     });
 
     const existingMedRows = medRowIndices.map((index) => meds[index]);
+    const usedExistingIds = new Set<string>();
+
+    const takeExisting = (expectedTime: string): MedicationRow | undefined => {
+      const byTime = existingMedRows.find(
+        (row) => !usedExistingIds.has(row.id) && medicationTimesEqual(row.time ?? '', expectedTime),
+      );
+      if (byTime) {
+        usedExistingIds.add(byTime.id);
+        return byTime;
+      }
+      const byOpenSlot = existingMedRows.find(
+        (row) => !usedExistingIds.has(row.id) && !(row.time ?? '').trim(),
+      );
+      if (byOpenSlot) {
+        usedExistingIds.add(byOpenSlot.id);
+        return byOpenSlot;
+      }
+      return undefined;
+    };
+
     const syncedRows: MedicationRow[] = expectedEntries.map((expected, index) => {
-      const existing = existingMedRows[index];
+      const existing = takeExisting(expected.time ?? '');
       return {
         id: existing?.id ?? generateSafeId(dateKey, meds.length + index, meds),
         time: expected.time,
         medication: expected.medication,
-        taken: existing?.taken ?? false,
-        skipped: existing?.skipped ?? false,
-        takenAt: existing?.takenAt,
         reminderEnabled: expected.reminderEnabled,
-        stockCycleVersion: existing?.stockCycleVersion,
+        ...this.copyIntakeState(existing),
       };
     });
+
+    // Dropped times: keep historical marks; refund stock only when removing a deducted take.
+    for (const existing of existingMedRows) {
+      if (usedExistingIds.has(existing.id)) continue;
+      if (existing.taken || existing.skipped) {
+        // Keep orphan historical mark outside the current time list.
+        syncedRows.push({
+          ...existing,
+          ...this.copyIntakeState(existing),
+        });
+        usedExistingIds.add(existing.id);
+        continue;
+      }
+      this.refundStockForRemovedRow(existing);
+    }
 
     if (medRowIndices.length === 0) {
       for (const syncedRow of syncedRows) {
@@ -1704,7 +1938,7 @@ class WellnessStore {
 
     const planWeekKey = this.resolveMedicationPlanWeekKey(medName, repeat, weekStartKey);
     const plan = this.getWeekMedicationPlan(planWeekKey);
-    const templatesForMed = plan.filter((entry) => entry.medication.trim() === medName);
+    const templatesForMed = plan.filter((entry) => medicationLabelsEqual(entry.medication, medName));
     const expectedEntries = templatesForMed.map((entry) => ({
       time: entry.time,
       medication: entry.medication,

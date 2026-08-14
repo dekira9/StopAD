@@ -15,7 +15,7 @@ export type AppChromeTheme = {
   sectionLabelBg: string;
   notesBlockBg: string;
   medicationCompleted: string;
-  /** Muted blue for medication name / dose / time fields in day rows. */
+  /** Soft periwinkle for medication name / dose / time fields in day rows. */
   medicationFieldText: string;
   accent: string;
   panelEdgeShadow: number;
@@ -27,17 +27,11 @@ export type AppChromeTheme = {
   subtlePanelBorder: string;
   checkOffBg: string;
   checkOffBorder: string;
-  reminderOnBg: string;
   activeBg: string;
   activeText: string;
   inactiveBg: string;
   inactiveBorder: string;
   inactiveText: string;
-  panicYesBg: string;
-  panicYesText: string;
-  panicNoBg: string;
-  panicNoBorder: string;
-  panicNoIcon: string;
 };
 
 export type ModalSurfaceTheme = {
@@ -64,39 +58,33 @@ export type ModalSurfaceTheme = {
 export function buildAppChromeTheme(theme: AppColorTheme, isDark: boolean): AppChromeTheme {
   return {
     icon: theme.text,
-    iconMuted: isDark ? 'rgba(242,242,242,0.55)' : 'rgba(20,20,20,0.45)',
-    cardBorder: isDark ? 'rgba(125,168,146,0.20)' : 'rgba(107,144,128,0.18)',
-    circleBg: isDark ? 'rgba(26,36,32,0.95)' : '#FFFFFF',
-    circleBorder: isDark ? 'rgba(125,168,146,0.30)' : 'rgba(107,144,128,0.22)',
+    iconMuted: isDark ? 'rgba(232,234,242,0.55)' : 'rgba(44,54,84,0.45)',
+    cardBorder: isDark ? 'rgba(154,168,212,0.20)' : 'rgba(138,155,210,0.22)',
+    circleBg: isDark ? 'rgba(26,30,42,0.95)' : '#FFFFFF',
+    circleBorder: isDark ? 'rgba(154,168,212,0.30)' : 'rgba(138,155,210,0.22)',
     circleShadow: isDark ? 0 : 0.07,
     contentBg: theme.background,
-    dayBorder: isDark ? 'rgba(125,168,146,0.24)' : 'rgba(107,144,128,0.20)',
-    rowBorder: isDark ? 'rgba(125,168,146,0.12)' : 'rgba(26,46,36,0.07)',
+    dayBorder: isDark ? 'rgba(154,168,212,0.24)' : 'rgba(138,155,210,0.22)',
+    rowBorder: isDark ? 'rgba(154,168,212,0.12)' : 'rgba(44,54,84,0.07)',
     sectionLabelBg: theme.backgroundSelected,
-    notesBlockBg: isDark ? 'rgba(21,28,24,0.70)' : Colors.light.cardSurface,
+    notesBlockBg: isDark ? 'rgba(22,26,38,0.70)' : Colors.light.cardSurface,
     medicationCompleted: isDark ? Colors.dark.medicationCompleted : Colors.light.medicationCompleted,
-    medicationFieldText: isDark ? '#8AA9B8' : Colors.light.todayMarker,
+    medicationFieldText: isDark ? '#A8B6DE' : Colors.light.todayMarker,
     accent: theme.accent,
-    panelEdgeShadow: isDark ? 0.22 : 0.09,
-    footerBorder: isDark ? 'rgba(125,168,146,0.22)' : 'rgba(107,144,128,0.16)',
-    modalOverlay: isDark ? 'rgba(5,10,7,0.72)' : 'rgba(20,35,25,0.38)',
-    modalBg: isDark ? '#151C18' : '#FFFFFF',
-    modalMutedBg: isDark ? '#0F1411' : '#F8FAF8',
-    subtlePanelBg: isDark ? 'rgba(26,36,32,0.80)' : 'rgba(229,237,232,0.55)',
-    subtlePanelBorder: isDark ? 'rgba(125,168,146,0.26)' : 'rgba(107,144,128,0.18)',
-    checkOffBg: isDark ? 'rgba(26,36,32,0.95)' : '#F0F4F1',
-    checkOffBorder: isDark ? 'rgba(125,168,146,0.30)' : 'rgba(107,144,128,0.24)',
-    reminderOnBg: isDark ? 'rgba(125,168,146,0.24)' : 'rgba(107,144,128,0.14)',
+    panelEdgeShadow: isDark ? 0.22 : 0.08,
+    footerBorder: isDark ? 'rgba(154,168,212,0.22)' : 'rgba(138,155,210,0.22)',
+    modalOverlay: isDark ? 'rgba(8,10,16,0.72)' : 'rgba(44,54,84,0.32)',
+    modalBg: isDark ? Colors.dark.cardSurface : Colors.light.cardSurface,
+    modalMutedBg: isDark ? Colors.dark.background : Colors.light.background,
+    subtlePanelBg: isDark ? 'rgba(26,30,42,0.80)' : 'rgba(238,240,248,0.75)',
+    subtlePanelBorder: isDark ? 'rgba(154,168,212,0.26)' : 'rgba(138,155,210,0.22)',
+    checkOffBg: isDark ? 'rgba(26,30,42,0.95)' : '#EEF0F8',
+    checkOffBorder: isDark ? 'rgba(154,168,212,0.30)' : 'rgba(138,155,210,0.22)',
     activeBg: theme.accent,
     activeText: theme.accentText,
-    inactiveBg: isDark ? 'rgba(26,36,32,0.95)' : '#FFFFFF',
-    inactiveBorder: isDark ? 'rgba(125,168,146,0.30)' : 'rgba(107,144,128,0.20)',
+    inactiveBg: isDark ? 'rgba(26,30,42,0.95)' : '#FFFFFF',
+    inactiveBorder: isDark ? 'rgba(154,168,212,0.30)' : 'rgba(138,155,210,0.22)',
     inactiveText: theme.text,
-    panicYesBg: isDark ? '#DC2626' : '#EF4444',
-    panicYesText: '#FFFFFF',
-    panicNoBg: isDark ? 'rgba(26,36,32,0.95)' : '#F0F4F1',
-    panicNoBorder: isDark ? '#4ADE80' : '#22C55E',
-    panicNoIcon: isDark ? '#4ADE80' : '#22C55E',
   };
 }
 

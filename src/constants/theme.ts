@@ -9,32 +9,28 @@ import { Platform } from 'react-native';
 
 export const Colors = {
   light: {
-    text: '#141414',
-    background: '#F8FAF8',
-    backgroundElement: '#E5EDE8',
-    backgroundSelected: '#F0F4F1',
-    textSecondary: '#6B6B6B',
-    accent: '#6B9080',
+    text: '#2C3654',
+    background: '#F5F6FA',
+    backgroundSelected: '#EEF0F8',
+    textSecondary: '#8B90A0',
+    accent: '#8A9BD2',
     accentText: '#FFFFFF',
-    todayMarker: '#6B8FA3',
-    panicRow: '#F2EBE8',
-    cardSurface: '#FCFDFC',
-    medicationCompleted: '#7A8F86',
-    weekdayName: '#D19174',
+    todayMarker: '#8A9BD2',
+    cardSurface: '#FFFFFF',
+    medicationCompleted: '#8A96B0',
+    weekdayName: '#68788f',
   },
   dark: {
-    text: '#F2F2F2',
-    background: '#0F1411',
-    backgroundElement: '#1A2420',
-    backgroundSelected: '#151C18',
-    textSecondary: '#A0A0A0',
-    accent: '#7DA892',
+    text: '#E8EAF2',
+    background: '#161A26',
+    backgroundSelected: '#161A26',
+    textSecondary: '#9AA0B0',
+    accent: '#9AA8D4',
     accentText: '#FFFFFF',
-    todayMarker: '#A3C9B5',
-    panicRow: '#241C1A',
-    cardSurface: '#151C18',
-    medicationCompleted: '#8FA89A',
-    weekdayName: '#D19174',
+    todayMarker: '#A8B6DE',
+    cardSurface: '#161A26',
+    medicationCompleted: '#9AA6BE',
+    weekdayName: '#A8B4C4',
   },
 } as const;
 
@@ -67,13 +63,13 @@ function blendColors(foreground: string, background: string, backgroundWeight: n
 }
 
 const DAY_WEEK_LIGHT: Record<WeekdayIndex, string> = {
-  0: '#E8E6F0', // Sunday — lavender
-  1: '#E3EBE2', // Monday — sage
-  2: '#E0E9EE', // Tuesday — blue mist
-  3: '#EEE9E2', // Wednesday — warm sand
-  4: '#E2EEE9', // Thursday — sea foam
-  5: '#FAF7EB', // Friday — soft parchment
-  6: '#EEE3E8', // Saturday — dusty rose
+  0: '#D3D7E9',
+  1: '#D3D7E9',
+  2: '#D3D7E9',
+  3: '#D3D7E9',
+  4: '#D3D7E9',
+  5: '#D3D7E9',
+  6: '#D3D7E9',
 };
 
 const DAY_WEEK_DARK = (Object.keys(DAY_WEEK_LIGHT) as unknown as WeekdayIndex[]).reduce(
@@ -93,11 +89,6 @@ export function getDayWeekBackground(isDark: boolean, dayOfWeek: WeekdayIndex): 
   return isDark ? DayWeekBackgrounds.dark[dayOfWeek] : DayWeekBackgrounds.light[dayOfWeek];
 }
 
-export function getDayWeekHeaderBackground(isDark: boolean, dayOfWeek: WeekdayIndex): string {
-  const base = getDayWeekBackground(isDark, dayOfWeek);
-  return isDark ? blendColors(base, '#FFFFFF', 0.06) : blendColors(base, '#000000', 0.08);
-}
-
 export type { WeekdayIndex };
 
 export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
@@ -113,6 +104,7 @@ const nativeFonts = {
   rounded: 'Nunito_400Regular',
   mono: Platform.OS === 'ios' ? 'ui-monospace' : 'monospace',
   condensed: 'RobotoCondensed_500Medium',
+  condensedRegular: 'RobotoCondensed_400Regular',
 } as const;
 
 export const Fonts = Platform.select({
@@ -129,6 +121,7 @@ export const Fonts = Platform.select({
     rounded: 'var(--font-sans)',
     mono: 'var(--font-mono)',
     condensed: 'var(--font-condensed)',
+    condensedRegular: 'var(--font-condensed)',
   },
 });
 

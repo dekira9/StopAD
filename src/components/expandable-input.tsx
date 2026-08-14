@@ -24,6 +24,8 @@ type ExpandableInputProps = {
   returnKeyType?: TextInputProps['returnKeyType'];
   onSubmitEditing?: () => void;
   blurOnSubmit?: boolean;
+  /** Keep multiline open and hide the expand chevron (e.g. week notes). */
+  alwaysExpanded?: boolean;
 };
 
 export function ExpandableInput({
@@ -45,24 +47,28 @@ export function ExpandableInput({
   returnKeyType = 'default',
   onSubmitEditing,
   blurOnSubmit,
+  alwaysExpanded = false,
 }: ExpandableInputProps) {
   const [containerWidth, setContainerWidth] = useState(0);
   const [contentWidth, setContentWidth] = useState(0);
   const [isFocused, setIsFocused] = useState(false);
 
+  const expanded = alwaysExpanded || isExpanded;
+
   const canExpand = useMemo(() => {
+    if (alwaysExpanded) return false;
     if (!value) return false;
     if (value.includes('\n')) return true;
     if (containerWidth <= 0) return false;
     return contentWidth > containerWidth + 1;
-  }, [value, containerWidth, contentWidth]);
+  }, [alwaysExpanded, value, containerWidth, contentWidth]);
 
-  const showToggle = isExpanded || canExpand;
+  const showToggle = !alwaysExpanded && (expanded || canExpand);
 
   return (
     <View style={styles.row}>
       <View
-        style={[styles.inputWrap, !isExpanded && styles.inputWrapCollapsed]}
+        style={[styles.inputWrap, !expanded && !isFocused && styles.inputWrapCollapsed]}
         onLayout={(event) => {
           const nextWidth = event.nativeEvent.layout.width;
           if (nextWidth !== containerWidth) {
@@ -72,11 +78,11 @@ export function ExpandableInput({
         <TextInput
           value={value}
           onChangeText={onChangeText}
-          multiline={isExpanded}
-          numberOfLines={isExpanded ? undefined : 1}
-          scrollEnabled={isExpanded}
-          textAlignVertical={isExpanded ? 'top' : 'center'}
-          selection={!isExpanded && !isFocused ? { start: 0, end: 0 } : selection}
+          multiline={expanded || isFocused}
+          numberOfLines={expanded || isFocused ? undefined : 1}
+          scrollEnabled={expanded}
+          textAlignVertical={expanded || isFocused ? 'top' : 'center'}
+          selection={!expanded && !isFocused ? { start: 0, end: 0 } : selection}
           placeholder={placeholderStyle ? undefined : placeholder}
           placeholderTextColor={placeholderTextColor}
           returnKeyType={returnKeyType}
@@ -98,8 +104,8 @@ export function ExpandableInput({
           }}
           style={[
             styles.input,
-            !isExpanded && styles.inputCollapsed,
-            isExpanded && styles.inputExpanded,
+            !expanded && !isFocused && styles.inputCollapsed,
+            (expanded || isFocused) && styles.inputExpanded,
             style,
             { color, opacity, textDecorationLine },
           ]}
@@ -109,13 +115,13 @@ export function ExpandableInput({
             pointerEvents="none"
             style={[
               styles.placeholderRow,
-              !isExpanded && styles.placeholderRowCollapsed,
-              isExpanded && styles.placeholderRowExpanded,
+              !expanded && styles.placeholderRowCollapsed,
+              expanded && styles.placeholderRowExpanded,
             ]}>
             <Text
               style={[
                 styles.placeholderText,
-                !isExpanded && styles.placeholderTextCollapsed,
+                !expanded && styles.placeholderTextCollapsed,
               placeholderStyle,
               { color: placeholderTextColor },
             ]}>
@@ -126,9 +132,9 @@ export function ExpandableInput({
       </View>
       {showToggle ? (
         <Pressable onPress={onToggleExpand} hitSlop={6} style={({ pressed }) => [styles.expandBtn, pressed && styles.expandPressed]}>
-          <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={14} color={iconMuted} />
+          <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={14} color={iconMuted} />
         </Pressable>
-      ) : (
+      ) : alwaysExpanded ? null : (
         <View style={styles.expandSpacer} />
       )}
     </View>

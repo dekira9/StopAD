@@ -90,6 +90,7 @@ export function buildSleepLogFromNightEvents(events: NightObservationEvent[]): S
     from: sleepStart,
     to: sleepEnd,
     awakenings,
+    extraSleeps: [],
   };
 }
 
@@ -98,5 +99,6 @@ export function mergeNightObservationIntoSleepLog(existing: SleepLog, night: Sle
     from: night.from || existing.from,
     to: night.to || existing.to,
     awakenings: [...existing.awakenings, ...night.awakenings],
+    extraSleeps: existing.extraSleeps ?? [],
   };
 }

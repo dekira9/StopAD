@@ -4,25 +4,45 @@ export type SleepAwakening = {
   to: string;
 };
 
+export type SleepSegment = {
+  id: string;
+  from: string;
+  to: string;
+};
+
 export type SleepLog = {
   from: string;
   to: string;
   awakenings: SleepAwakening[];
+  /** Additional sleep intervals beyond the main from–to range. */
+  extraSleeps: SleepSegment[];
 };
 
 export const EMPTY_SLEEP_LOG: SleepLog = {
   from: '',
   to: '',
   awakenings: [],
+  extraSleeps: [],
 };
 
 const SLEEP_LOG_PREFIX = '{"from":';
 
+function parseSegments(items: unknown, idPrefix: string): SleepSegment[] {
+  if (!Array.isArray(items)) return [];
+  return items
+    .filter((item): item is SleepSegment => !!item && typeof item === 'object')
+    .map((item, index) => ({
+      id: typeof item.id === 'string' ? item.id : `${idPrefix}-${index}`,
+      from: typeof item.from === 'string' ? item.from : '',
+      to: typeof item.to === 'string' ? item.to : '',
+    }));
+}
+
 export function parseSleepLog(value: string): SleepLog {
   const trimmed = value.trim();
-  if (!trimmed) return { ...EMPTY_SLEEP_LOG, awakenings: [] };
+  if (!trimmed) return { ...EMPTY_SLEEP_LOG, awakenings: [], extraSleeps: [] };
   if (!trimmed.startsWith(SLEEP_LOG_PREFIX)) {
-    return { ...EMPTY_SLEEP_LOG, awakenings: [] };
+    return { ...EMPTY_SLEEP_LOG, awakenings: [], extraSleeps: [] };
   }
 
   try {
@@ -30,29 +50,30 @@ export function parseSleepLog(value: string): SleepLog {
     return {
       from: typeof parsed.from === 'string' ? parsed.from : '',
       to: typeof parsed.to === 'string' ? parsed.to : '',
-      awakenings: Array.isArray(parsed.awakenings)
-        ? parsed.awakenings
-            .filter((item): item is SleepAwakening => !!item && typeof item === 'object')
-            .map((item, index) => ({
-              id: typeof item.id === 'string' ? item.id : `aw-${index}`,
-              from: typeof item.from === 'string' ? item.from : '',
-              to: typeof item.to === 'string' ? item.to : '',
-            }))
-        : [],
+      awakenings: parseSegments(parsed.awakenings, 'aw'),
+      extraSleeps: parseSegments(parsed.extraSleeps, 'sl'),
     };
   } catch {
-    return { ...EMPTY_SLEEP_LOG, awakenings: [] };
+    return { ...EMPTY_SLEEP_LOG, awakenings: [], extraSleeps: [] };
   }
 }
 
 export function serializeSleepLog(log: SleepLog): string {
-  if (!log.from.trim() && !log.to.trim() && log.awakenings.length === 0) return '';
+  if (
+    !log.from.trim() &&
+    !log.to.trim() &&
+    log.awakenings.length === 0 &&
+    log.extraSleeps.length === 0
+  ) {
+    return '';
+  }
   return JSON.stringify(log);
 }
 
 export function hasSleepLogContent(log: SleepLog): boolean {
   if (log.from.trim() || log.to.trim()) return true;
-  return log.awakenings.length > 0;
+  if (log.awakenings.length > 0) return true;
+  return log.extraSleeps.length > 0;
 }
 
 function timeToMinutes(time: string): number | null {
@@ -77,20 +98,33 @@ function durationMinutes(from: string, to: string): number | null {
 }
 
 export function calculateSleepTotalMinutes(log: SleepLog): number | null {
-  if (!log.from.trim() || !log.to.trim()) return null;
+  const hasMain = !!log.from.trim() && !!log.to.trim();
+  const completeExtras = log.extraSleeps.filter((item) => item.from.trim() && item.to.trim());
 
-  const mainDuration = durationMinutes(log.from, log.to);
-  if (mainDuration === null) return null;
+  if (!hasMain && completeExtras.length === 0) return null;
 
-  const awakeMinutes = log.awakenings.reduce((total, awakening) => {
-    if (!awakening.from.trim() || !awakening.to.trim()) return total;
-    const awakeningDuration = durationMinutes(awakening.from, awakening.to);
-    if (awakeningDuration === null) return total;
-    return total + awakeningDuration;
-  }, 0);
+  let total = 0;
 
-  const sleepMinutes = mainDuration - awakeMinutes;
-  return sleepMinutes > 0 ? sleepMinutes : null;
+  if (hasMain) {
+    const mainDuration = durationMinutes(log.from, log.to);
+    if (mainDuration === null) return null;
+
+    const awakeMinutes = log.awakenings.reduce((sum, awakening) => {
+      if (!awakening.from.trim() || !awakening.to.trim()) return sum;
+      const awakeningDuration = durationMinutes(awakening.from, awakening.to);
+      if (awakeningDuration === null) return sum;
+      return sum + awakeningDuration;
+    }, 0);
+
+    total += Math.max(0, mainDuration - awakeMinutes);
+  }
+
+  for (const segment of completeExtras) {
+    const duration = durationMinutes(segment.from, segment.to);
+    if (duration !== null) total += duration;
+  }
+
+  return total > 0 ? total : null;
 }
 
 export function formatSleepClock(totalMinutes: number): string {
@@ -116,6 +150,14 @@ export function formatSleepDuration(
 export function createSleepAwakening(index: number): SleepAwakening {
   return {
     id: `aw-${Date.now()}-${index}`,
+    from: '',
+    to: '',
+  };
+}
+
+export function createExtraSleep(index: number): SleepSegment {
+  return {
+    id: `sl-${Date.now()}-${index}`,
     from: '',
     to: '',
   };

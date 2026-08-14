@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Image } from 'expo-image';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import {
@@ -9,7 +10,7 @@ import {
 import { getGrowthRingDefinition, GROWTH_RINGS, type GrowthRingId } from '@/constants/growth-rings';
 import type { AppLabels, Language } from '@/constants/i18n';
 import { Fonts } from '@/constants/theme';
-import { formatSectionTitle } from '@/constants/typography';
+import { dayMedicationsHeaderStyle, formatSectionTitle } from '@/constants/typography';
 import { useAppChromeTheme } from '@/hooks/use-app-chrome-theme';
 import {
   countRingSelections,
@@ -59,17 +60,17 @@ const CENTER_Y = RING_HEIGHT / 2;
 const OUTER_W = 296;
 const OUTER_H = 148;
 
-/** Inner → outer: muted blue → soft green. */
-const RING_COLORS_LIGHT = ['#5B7F96', '#71A7B0', '#86B5AC', '#C5E0CA'] as const;
+/** Inner → outer: soft blue → lavender → mint → cream. */
+const RING_COLORS_LIGHT = ['#AFC1E2', '#DED9F8', '#E0F0EA', '#FCECD8'] as const;
 const RING_COLORS_MUTED = [
-  'rgba(91,127,150,0.34)',
-  'rgba(113,167,176,0.34)',
-  'rgba(134,181,172,0.34)',
-  'rgba(197,224,202,0.34)',
+  'rgba(175,193,226,0.34)',
+  'rgba(222,217,248,0.34)',
+  'rgba(224,240,234,0.34)',
+  'rgba(252,236,216,0.34)',
 ] as const;
 const CENTER_FILL = '#E8E8E8';
-/** Center digit colors — ring 4 uses a deeper green so it reads on light gray. */
-const RING_CENTER_TEXT = ['#5B7F96', '#71A7B0', '#86B5AC', '#5A8F6E'] as const;
+/** Center digit colors — deeper tones so they read on light gray. */
+const RING_CENTER_TEXT = ['#6B82A8', '#8B82B8', '#6A9A8A', '#C4A070'] as const;
 const CENTER_EMPTY_TEXT = '#9A9A9A';
 
 function getRingBand(_ringId: GrowthRingId): { side: number; vertical: number } {
@@ -105,12 +106,14 @@ function getCenterSize(): { width: number; height: number } {
 }
 
 /** Layers from outside in: colored fill, then gap cutout. Center is drawn separately. */
-function getRingLayers(): Array<
-  { key: string; width: number; height: number; kind: 'ring'; ringId: GrowthRingId } | { key: string; width: number; height: number; kind: 'gap' }
-> {
-  const layers: Array<
-    { key: string; width: number; height: number; kind: 'ring'; ringId: GrowthRingId } | { key: string; width: number; height: number; kind: 'gap' }
-  > = [];
+function getRingLayers(): (
+  | { key: string; width: number; height: number; kind: 'ring'; ringId: GrowthRingId }
+  | { key: string; width: number; height: number; kind: 'gap' }
+)[] {
+  const layers: (
+    | { key: string; width: number; height: number; kind: 'ring'; ringId: GrowthRingId }
+    | { key: string; width: number; height: number; kind: 'gap' }
+  )[] = [];
   let side = 0;
   let vertical = 0;
 
@@ -328,14 +331,21 @@ export function GrowthRingsSection({ language, labels, value, onChange }: Props)
   };
 
   return (
-    <View style={[styles.section, { backgroundColor: theme.inactiveBg, borderColor: theme.rowBorder }]}>
-      <Text style={[styles.sectionTitle, { backgroundColor: theme.sectionLabelBg, color: theme.textSecondary }]}>
-        {formatSectionTitle(labels.whereAmIToday)}
-      </Text>
+    <View style={[styles.section, { backgroundColor: '#FFFFFF', borderColor: theme.rowBorder }]}>
+      <View style={styles.header}>
+        <View style={styles.headerText}>
+          <Text style={styles.sectionTitle}>{formatSectionTitle(labels.whereAmIToday)}</Text>
+          <Text style={[styles.hint, { color: theme.textSecondary }]}>{labels.growthRingTapHint}</Text>
+        </View>
+        <Image
+          source={require('@/assets/images/where-decor.png')}
+          style={styles.headerDecor}
+          contentFit="contain"
+          accessibilityIgnoresInvertColors
+        />
+      </View>
 
       <View style={styles.body}>
-        <Text style={[styles.hint, { color: theme.textSecondary }]}>{labels.growthRingTapHint}</Text>
-
         <View style={styles.ringsBlock}>
           <RingsCanvas
             level={level}
@@ -464,19 +474,36 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 4,
     borderWidth: 1,
-    borderRadius: 10,
+    borderRadius: 14,
     overflow: 'hidden',
+    backgroundColor: '#FFFFFF',
+  },
+  header: {
+    position: 'relative',
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 4,
+    minHeight: 88,
+  },
+  headerText: {
+    maxWidth: '62%',
+    gap: 6,
+    zIndex: 1,
+  },
+  headerDecor: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 148,
+    height: 100,
   },
   sectionTitle: {
-    fontSize: 11,
-    fontFamily: Fonts.sansBold,
-    letterSpacing: 1.2,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    ...dayMedicationsHeaderStyle,
+    color: '#000000',
   },
   body: {
     paddingHorizontal: 12,
-    paddingTop: 10,
+    paddingTop: 6,
     paddingBottom: 12,
     gap: 12,
   },
@@ -484,6 +511,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 17,
     fontFamily: Fonts.sans,
+    textAlign: 'left',
   },
   ringsBlock: {
     alignItems: 'center',
@@ -521,10 +549,10 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   legendDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginTop: 4,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    marginTop: 1,
   },
   legendTextWrap: {
     flex: 1,

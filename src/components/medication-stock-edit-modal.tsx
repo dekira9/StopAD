@@ -1,8 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
+import { format, parse } from 'date-fns';
+import { Image } from 'expo-image';
 import { useMemo, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import type { AppLabels } from '@/constants/i18n';
+import { LANGUAGES } from '@/constants/i18n';
 import { Fonts } from '@/constants/theme';
 import {
   dayMedicationsHeaderStyle,
@@ -12,10 +15,18 @@ import {
   weekServiceTextStyle,
 } from '@/constants/typography';
 import { useAppChromeTheme } from '@/hooks/use-app-chrome-theme';
+import { wellnessStore } from '@/stores/wellness-store';
+import { formatDayMonth } from '@/utils/date-format';
+
+const RESERVE_DECOR_WIDTH = 110;
+const RESERVE_DECOR_HEIGHT = 110;
 
 export type MedicationStockEditSavePayload = {
-  stockCount: number;
+  stockCount?: number;
   packageSize?: number;
+  /** Present only when the user entered a refill amount > 0. */
+  lastRefillCount?: number;
+  lastRefillDateKey?: string;
 };
 
 type Props = {
@@ -23,6 +34,8 @@ type Props = {
   labels: AppLabels;
   initialRemaining?: number;
   initialPackageSize?: number;
+  initialLastRefillCount?: number;
+  initialLastRefillDateKey?: string;
   onClose: () => void;
   onSave: (payload: MedicationStockEditSavePayload) => void;
 };
@@ -43,10 +56,14 @@ function MedicationStockEditModalContent({
   labels,
   initialRemaining,
   initialPackageSize,
+  initialLastRefillCount,
+  initialLastRefillDateKey,
   onClose,
   onSave,
 }: ContentProps) {
   const { modal: theme, chrome } = useAppChromeTheme();
+  const language = wellnessStore.preferredLanguage ?? 'en';
+  const locale = LANGUAGES[language].locale;
   const [remaining, setRemaining] = useState(
     initialRemaining !== undefined ? String(initialRemaining) : '',
   );
@@ -59,6 +76,21 @@ function MedicationStockEditModalContent({
   const hasStockInput = remaining.trim() !== '' || refill.trim() !== '';
   const hasPackageInput = packageSize.trim() !== '';
   const canSave = hasStockInput || hasPackageInput || initialRemaining !== undefined;
+
+  const lastRefillHint = useMemo(() => {
+    if (
+      typeof initialLastRefillCount !== 'number' ||
+      initialLastRefillCount <= 0 ||
+      !initialLastRefillDateKey
+    ) {
+      return null;
+    }
+    const date = parse(initialLastRefillDateKey, 'yyyy-MM-dd', new Date());
+    if (Number.isNaN(date.getTime())) return null;
+    return labels.medicationStockLastRefill
+      .replace('{n}', String(initialLastRefillCount))
+      .replace('{date}', formatDayMonth(date, locale));
+  }, [initialLastRefillCount, initialLastRefillDateKey, labels.medicationStockLastRefill, locale]);
 
   return (
     <View style={[styles.overlay, { backgroundColor: theme.modalOverlay }]}>
@@ -81,24 +113,38 @@ function MedicationStockEditModalContent({
           </Pressable>
         </View>
 
-        <View style={styles.content}>
-          <Text style={[styles.hint, { color: theme.textSecondary }]}>{labels.medicationStockDoseHint}</Text>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}>
+          <View style={styles.hintRow}>
+            <Image
+              source={require('@/assets/images/dose1.png')}
+              style={styles.hintDecor}
+              contentFit="contain"
+              accessibilityIgnoresInvertColors
+            />
+            <Text style={[styles.hint, { color: theme.textSecondary }]}>
+              {labels.medicationStockDoseHint}
+            </Text>
+          </View>
 
           <View
             style={[
-              styles.panel,
-              { backgroundColor: chrome.notesBlockBg, borderColor: chrome.dayBorder },
+              styles.remainingCard,
+              { minHeight: RESERVE_DECOR_HEIGHT + 12 },
             ]}>
-            <View
-              style={[
-                styles.panelHeader,
-                { backgroundColor: theme.sectionLabelBg, borderColor: theme.rowBorder },
-              ]}>
-              <Text style={styles.panelHeaderText}>
+            <Image
+              source={require('@/assets/images/medication-reserve-decor-soft.png')}
+              style={styles.remainingDecor}
+              contentFit="contain"
+              accessibilityIgnoresInvertColors
+            />
+            <View style={styles.remainingFields}>
+              <Text style={[styles.remainingLabel, { color: theme.text }]}>
                 {formatSectionTitle(labels.medicationStockRemaining)}
               </Text>
-            </View>
-            <View style={[styles.panelBody, { backgroundColor: theme.inactiveBg, borderColor: theme.rowBorder }]}>
               <TextInput
                 value={remaining}
                 onChangeText={(value) => setRemaining(digitsOnly(value))}
@@ -107,42 +153,78 @@ function MedicationStockEditModalContent({
                 maxLength={5}
                 placeholder="0"
                 placeholderTextColor={theme.iconMuted}
-                style={[styles.panelInput, { color: chrome.medicationFieldText }]}
+                style={[
+                  styles.remainingInput,
+                  { color: chrome.medicationFieldText, borderColor: theme.rowBorder },
+                ]}
               />
             </View>
+          </View>
 
-            <View
-              style={[
-                styles.panelHeader,
-                { backgroundColor: theme.sectionLabelBg, borderColor: theme.rowBorder },
-              ]}>
-              <Text style={styles.panelHeaderText}>
+          <View
+            style={[
+              styles.remainingCard,
+              {
+                minHeight: RESERVE_DECOR_HEIGHT + 12,
+                backgroundColor: '#F3FAF6',
+              },
+            ]}>
+            <Image
+              source={require('@/assets/images/med-refill-green.png')}
+              style={styles.remainingDecor}
+              contentFit="contain"
+              accessibilityIgnoresInvertColors
+            />
+            <View style={styles.remainingFields}>
+              <Text style={[styles.remainingLabel, { color: theme.text }]}>
                 {formatSectionTitle(labels.medicationStockRefill)}
               </Text>
+              <View style={styles.refillInputWrap}>
+                {!refill.trim() ? (
+                  <Text
+                    pointerEvents="none"
+                    style={[styles.refillPlusPlaceholder, { color: theme.iconMuted }]}>
+                    +
+                  </Text>
+                ) : null}
+                <TextInput
+                  value={refill}
+                  onChangeText={(value) => setRefill(digitsOnly(value))}
+                  keyboardType="number-pad"
+                  inputMode="numeric"
+                  maxLength={5}
+                  style={[
+                    styles.remainingInput,
+                    { color: chrome.medicationFieldText, borderColor: theme.rowBorder },
+                  ]}
+                />
+              </View>
+              {lastRefillHint ? (
+                <Text style={[styles.lastRefillHint, { color: theme.textSecondary }]}>
+                  {lastRefillHint}
+                </Text>
+              ) : null}
             </View>
-            <View style={[styles.panelBody, { backgroundColor: theme.inactiveBg, borderColor: theme.rowBorder }]}>
-              <TextInput
-                value={refill}
-                onChangeText={(value) => setRefill(digitsOnly(value))}
-                keyboardType="number-pad"
-                inputMode="numeric"
-                maxLength={5}
-                placeholder="0"
-                placeholderTextColor={theme.iconMuted}
-                style={[styles.panelInput, { color: chrome.medicationFieldText }]}
-              />
-            </View>
+          </View>
 
-            <View
-              style={[
-                styles.panelHeader,
-                { backgroundColor: theme.sectionLabelBg, borderColor: theme.rowBorder },
-              ]}>
-              <Text style={styles.panelHeaderText}>
+          <View
+            style={[
+              styles.remainingCard,
+              {
+                minHeight: RESERVE_DECOR_HEIGHT + 12,
+                backgroundColor: '#F3F8FC',
+              },
+            ]}>
+            <Image
+              source={require('@/assets/images/medication-blister-mint-blue5.png')}
+              style={styles.remainingDecor}
+              contentFit="contain"
+              accessibilityIgnoresInvertColors
+            />
+            <View style={styles.remainingFields}>
+              <Text style={[styles.remainingLabel, { color: theme.text }]}>
                 {formatSectionTitle(labels.medicationStockPackageSize)}
               </Text>
-            </View>
-            <View style={[styles.panelBody, { backgroundColor: theme.inactiveBg, borderColor: theme.rowBorder }]}>
               <TextInput
                 value={packageSize}
                 onChangeText={(value) => setPackageSize(digitsOnly(value))}
@@ -151,34 +233,47 @@ function MedicationStockEditModalContent({
                 maxLength={5}
                 placeholder="0"
                 placeholderTextColor={theme.iconMuted}
-                style={[styles.panelInput, { color: chrome.medicationFieldText }]}
+                style={[
+                  styles.remainingInput,
+                  { color: chrome.medicationFieldText, borderColor: theme.rowBorder },
+                ]}
               />
             </View>
-
-            <View
-              style={[
-                styles.panelHeader,
-                { backgroundColor: theme.sectionLabelBg, borderColor: theme.rowBorder },
-              ]}>
-              <Text style={styles.panelHeaderText}>
-                {formatSectionTitle(labels.medicationStockTotal)}
-              </Text>
-            </View>
-            <View style={[styles.panelBodyLast, { backgroundColor: theme.inactiveBg }]}>
-              <Text style={[styles.totalValue, { color: chrome.medicationFieldText }]}>
-                {hasStockInput ? total : (initialRemaining ?? 0)}
-              </Text>
-            </View>
           </View>
-        </View>
+
+          <View
+            style={[
+              styles.panel,
+              styles.totalRow,
+              {
+                backgroundColor: theme.sectionLabelBg,
+                borderColor: chrome.dayBorder,
+              },
+            ]}>
+            <Text style={[styles.panelHeaderText, { color: theme.text }]}>
+              {formatSectionTitle(labels.medicationStockTotal)}
+            </Text>
+            <Text style={[styles.totalValue, { color: chrome.medicationFieldText }]}>
+              {hasStockInput ? total : (initialRemaining ?? 0)}
+            </Text>
+          </View>
+        </ScrollView>
 
         <View style={[styles.footer, { borderTopColor: theme.subtlePanelBorder, backgroundColor: theme.modalBg }]}>
           <Pressable
             onPress={() => {
               if (!canSave) return;
+              const refillCount = parseCount(refill);
               onSave({
-                stockCount: hasStockInput ? total : (initialRemaining ?? 0),
+                // Keep existing remaining when user only edits package size.
+                stockCount: hasStockInput ? total : initialRemaining,
                 packageSize: hasPackageInput ? parseCount(packageSize) : initialPackageSize,
+                ...(refillCount > 0
+                  ? {
+                      lastRefillCount: refillCount,
+                      lastRefillDateKey: format(new Date(), 'yyyy-MM-dd'),
+                    }
+                  : {}),
               });
             }}
             disabled={!canSave}
@@ -202,7 +297,7 @@ function MedicationStockEditModalContent({
 }
 
 export function MedicationStockEditModal({ visible, ...contentProps }: Props) {
-  const key = `${contentProps.initialRemaining ?? 'empty'}-${contentProps.initialPackageSize ?? 'pack'}`;
+  const key = `${contentProps.initialRemaining ?? 'empty'}-${contentProps.initialPackageSize ?? 'pack'}-${contentProps.initialLastRefillCount ?? 'norefill'}-${contentProps.initialLastRefillDateKey ?? 'nodate'}`;
 
   return (
     <Modal transparent visible={visible} animationType="slide" onRequestClose={contentProps.onClose}>
@@ -218,6 +313,7 @@ const styles = StyleSheet.create({
   },
   card: {
     maxHeight: '92%',
+    flexShrink: 1,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     borderWidth: 1,
@@ -249,48 +345,112 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center',
   },
-  content: {
+  scroll: {
+    flexGrow: 0,
+    flexShrink: 1,
+    minHeight: 0,
+  },
+  scrollContent: {
     paddingHorizontal: 16,
     paddingBottom: 12,
     gap: 10,
   },
+  hintRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  hintDecor: {
+    width: 60,
+    height: 60,
+  },
   hint: {
     ...weekServiceTextStyle,
+    flex: 1,
     letterSpacing: 0,
     lineHeight: 18,
+  },
+  remainingCard: {
+    position: 'relative',
+    justifyContent: 'center',
+    backgroundColor: '#F3F0FF',
+    borderRadius: 18,
+    paddingRight: 12,
+    paddingVertical: 10,
+    overflow: 'visible',
+  },
+  remainingDecor: {
+    position: 'absolute',
+    left: 2,
+    top: '60%',
+    width: RESERVE_DECOR_WIDTH,
+    height: RESERVE_DECOR_HEIGHT,
+    transform: [{ translateY: -RESERVE_DECOR_HEIGHT / 2 }],
+  },
+  remainingFields: {
+    alignItems: 'center',
+    gap: 10,
+    minWidth: 0,
+    marginLeft: RESERVE_DECOR_WIDTH - 4,
+  },
+  remainingLabel: {
+    ...weekBodyTextStyle,
+    fontFamily: Fonts.sansSemiBold,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  lastRefillHint: {
+    ...weekServiceTextStyle,
+    textAlign: 'center',
+    letterSpacing: 0,
+    lineHeight: 16,
+  },
+  remainingInput: {
+    flexGrow: 0,
+    flexShrink: 1,
+    minWidth: 72,
+    maxWidth: 100,
+    minHeight: 48,
+    borderWidth: 1,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    textAlign: 'center',
+    fontSize: 28,
+    fontFamily: Fonts.sansSemiBold,
+    fontWeight: '600',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  refillInputWrap: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  refillPlusPlaceholder: {
+    position: 'absolute',
+    zIndex: 1,
+    fontSize: 40,
+    lineHeight: 44,
+    fontFamily: Fonts.sansSemiBold,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   panel: {
     borderWidth: 1,
     borderRadius: 8,
     overflow: 'hidden',
   },
-  panelHeader: {
+  totalRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderBottomWidth: 1,
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 6,
+    paddingVertical: 12,
+    gap: 12,
   },
   panelHeaderText: {
     ...dayMedicationsHeaderStyle,
-  },
-  panelBody: {
-    borderBottomWidth: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  panelBodyLast: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  panelInput: {
-    ...weekBodyTextStyle,
-    fontFamily: Fonts.sansSemiBold,
-    fontWeight: '600',
-    lineHeight: 20,
-    paddingVertical: 0,
-    paddingHorizontal: 0,
+    flexShrink: 1,
   },
   totalValue: {
     ...weekBodyTextStyle,

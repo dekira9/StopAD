@@ -38,12 +38,12 @@ const RING_ILLUSTRATION_GAP = 2;
 /** Same for every ring: L/R thicker than T/B. */
 const RING_ILLUSTRATION_BAND_SIDE = 16;
 const RING_ILLUSTRATION_BAND_VERTICAL = 6;
-const RING_ILLUSTRATION_COLORS = ['#5B7F96', '#71A7B0', '#86B5AC', '#C5E0CA'] as const;
+const RING_ILLUSTRATION_COLORS = ['#AFC1E2', '#DED9F8', '#E0F0EA', '#FCECD8'] as const;
 const RING_ILLUSTRATION_MUTED = [
-  'rgba(91,127,150,0.36)',
-  'rgba(113,167,176,0.36)',
-  'rgba(134,181,172,0.36)',
-  'rgba(197,224,202,0.36)',
+  'rgba(175,193,226,0.36)',
+  'rgba(222,217,248,0.36)',
+  'rgba(224,240,234,0.36)',
+  'rgba(252,236,216,0.36)',
 ] as const;
 const RING_ILLUSTRATION_CENTER = '#E8E8E8';
 const RING_ILLUSTRATION_GAP_FILL = '#FFFFFF';
@@ -78,7 +78,7 @@ function GrowthRingsIllustration({
   const cx = outerW / 2;
   const cy = outerH / 2;
 
-  const layers: Array<{ key: string; width: number; height: number; color: string }> = [];
+  const layers: { key: string; width: number; height: number; color: string }[] = [];
   let side = 0;
   let vertical = 0;
   for (let id = 4; id >= 1; id -= 1) {

@@ -1,4 +1,4 @@
-import { format } from 'date-fns';
+import { addDays, format, isWithinInterval, startOfDay } from 'date-fns';
 import type { Locale } from 'date-fns';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
@@ -8,10 +8,15 @@ import type { AppLabels, Language } from '@/constants/i18n';
 import type { DayLog } from '@/stores/wellness-store';
 import { formatSleepClock } from '@/utils/sleep-log';
 import {
+  buildWeekFactLines,
+  buildWeekFacts,
   buildWeeklySummaryEntries,
   buildWeeklyTriggerCounts,
+  compareWeekFacts,
   formatWeeklyTriggerLine,
   getWeeklySummaryMaxPanic,
+  sliceWeeklyEntriesByCount,
+  sliceWeeklyEntriesThroughDate,
   type WeeklySummaryDayEntry,
 } from '@/utils/weekly-summary-data';
 
@@ -95,6 +100,20 @@ export function buildWeeklySummaryHtml({
   weekSummaryText,
 }: ExportOptions): string {
   const entries = buildWeeklySummaryEntries(weekDays, days, locale, language);
+  const previousWeekDays = weekDays.map((day) => addDays(day, -7));
+  const previousEntries = buildWeeklySummaryEntries(previousWeekDays, days, locale, language);
+  const today = startOfDay(new Date());
+  const weekStart = startOfDay(weekDays[0]);
+  const weekEnd = startOfDay(weekDays[weekDays.length - 1]);
+  const throughDateKey = isWithinInterval(today, { start: weekStart, end: weekEnd })
+    ? format(today, 'yyyy-MM-dd')
+    : null;
+  const currentSlice = sliceWeeklyEntriesThroughDate(entries, throughDateKey);
+  const previousSlice = sliceWeeklyEntriesByCount(previousEntries, throughDateKey ? currentSlice.length : null);
+  const factLines = buildWeekFactLines(
+    compareWeekFacts(buildWeekFacts(currentSlice), buildWeekFacts(previousSlice)),
+    labels,
+  );
   const maxPanic = getWeeklySummaryMaxPanic(entries);
   const triggerCounts = buildWeeklyTriggerCounts(entries, language);
   const weekRange = formatWeekRange(weekDays, locale);
@@ -123,8 +142,12 @@ export function buildWeeklySummaryHtml({
     .join('');
 
   const summaryBlock = weekSummaryText?.trim()
-    ? `<div class="notes"><div class="notes-title">${escapeHtml(labels.weeklySummary)}</div><div class="notes-body">${escapeHtml(weekSummaryText.trim())}</div></div>`
+    ? `<div class="notes"><div class="notes-title">${escapeHtml(labels.weeklyMyNotes)}</div><div class="notes-body">${escapeHtml(weekSummaryText.trim())}</div></div>`
     : '';
+
+  const factsBlock = `<div class="facts"><div class="facts-title">${escapeHtml(labels.weeklyFactsTitle)}</div>${factLines
+    .map((line) => `<div class="facts-line">${escapeHtml(line)}</div>`)
+    .join('')}</div>`;
 
   const mainTriggersBlock =
     triggerCounts.length === 0
@@ -239,11 +262,29 @@ export function buildWeeklySummaryHtml({
         margin-bottom: 4px;
       }
       .main-triggers-line:last-child { margin-bottom: 0; }
+      .facts {
+        margin: 14px 0 16px;
+        padding: 10px 12px;
+        border: 1px solid #d7d7d7;
+        border-radius: 10px;
+      }
+      .facts-title {
+        font-size: 11px;
+        font-weight: 800;
+        margin-bottom: 6px;
+      }
+      .facts-line {
+        font-size: 11px;
+        line-height: 1.45;
+        margin-bottom: 3px;
+      }
+      .facts-line:last-child { margin-bottom: 0; }
     </style>
   </head>
   <body>
     <h1>${escapeHtml(labels.weeklySummary)}</h1>
     <div class="week-range">${escapeHtml(weekRange)}</div>
+    ${factsBlock}
     <table>
       <thead>
         <tr>

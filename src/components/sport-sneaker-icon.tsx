@@ -1,0 +1,54 @@
+import Svg, { Path } from 'react-native-svg';
+
+type Props = {
+  size?: number;
+  color?: string;
+  strokeWidth?: number;
+};
+
+/** Contour sneaker from assets/images/sport-sneaker1.svg */
+export function SportSneakerIcon({ size = 28, color = '#4A7D68', strokeWidth = 2 }: Props) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 43.88 36" fill="none">
+      <Path
+        d="M25.76,12.08l.1.15a2.94,2.94,0,0,1,.85,1l.88,2a1,1,0,0,0,.19.26l.14.15a7.3,7.3,0,0,1,.74.44,7.48,7.48,0,0,1,.85,1.1l.93,1.78a2.09,2.09,0,0,0,.55.63l.43.2a1.72,1.72,0,0,1,.57.57l1,1.9.06.09.24.32a1.09,1.09,0,0,0,.44.35l1.47.64A53.2,53.2,0,0,1,40.66,26a6.74,6.74,0,0,1,1.45,1.47,8,8,0,0,1,.77,3.21,4.66,4.66,0,0,1-.8,3,4.27,4.27,0,0,1-2,1.13A7.56,7.56,0,0,1,39,35l-7.8-.12-.32,0a14.71,14.71,0,0,1-1.64-.32,22.1,22.1,0,0,1-4.36-2.35c-5.69-4-15.73-10.55-22.8-15.08a2.39,2.39,0,0,1-.84-1,3,3,0,0,1-.14-1.71A14.08,14.08,0,0,1,2.44,12l0,0,5.8-9.43A3,3,0,0,1,10.11,1a1.94,1.94,0,0,1,1.81.56,1.84,1.84,0,0,1,.32,1.34s-.05.57,0,.9a12.74,12.74,0,0,0,.3,2.31,4,4,0,0,0,.35.8,4.23,4.23,0,0,0,1.73,1.69,12.35,12.35,0,0,0,1.16.59,7.21,7.21,0,0,0,1.63.41,4.83,4.83,0,0,0,1.75-.27,7.44,7.44,0,0,0,1.57-.76,15.74,15.74,0,0,1,1.42-1.1,2.29,2.29,0,0,1,1.65-.11,3.1,3.1,0,0,1,1.18.95,2.61,2.61,0,0,1,.43,1.12.2.2,0,0,0,0,.07,12.25,12.25,0,0,1,.38,2.54,6.63,6.63,0,0,0-3.18,2.08"
+        fill="none"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M28.1,16a5,5,0,0,0-3.05,2"
+        fill="none"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeMiterlimit={10}
+      />
+      <Path
+        d="M27.81,21.43c.46-1.05,2.85-2,2.85-2"
+        fill="none"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeMiterlimit={10}
+      />
+      <Path
+        d="M33.24,22.58s-2.65,1.63-3.05,2.62"
+        fill="none"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeMiterlimit={10}
+      />
+      <Path
+        d="M2.45,12s12.24,8,20.83,14a46.68,46.68,0,0,0,6.35,4,11.42,11.42,0,0,0,2.66.81l.5,0,10.09.05"
+        fill="none"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeMiterlimit={10}
+      />
+    </Svg>
+  );
+}

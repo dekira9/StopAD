@@ -8,6 +8,7 @@ import {
   useFonts as useNunitoFonts,
 } from '@expo-google-fonts/nunito';
 import {
+  RobotoCondensed_400Regular,
   RobotoCondensed_500Medium,
   useFonts as useRobotoCondensedFonts,
 } from '@expo-google-fonts/roboto-condensed';
@@ -21,6 +22,13 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { Colors, Fonts } from '@/constants/theme';
 import { useAppSystemChrome } from '@/hooks/use-system-chrome';
+
+type ComponentWithDefaultProps = {
+  defaultProps?: Record<string, unknown>;
+};
+
+const TextWithDefaultProps = Text as typeof Text & ComponentWithDefaultProps;
+const TextInputWithDefaultProps = TextInput as typeof TextInput & ComponentWithDefaultProps;
 
 SplashScreen.preventAutoHideAsync();
 
@@ -36,6 +44,7 @@ export default function RootLayout() {
     Nunito_800ExtraBold,
   });
   const [condensedLoaded] = useRobotoCondensedFonts({
+    RobotoCondensed_400Regular,
     RobotoCondensed_500Medium,
   });
   const fontsLoaded = nunitoLoaded && condensedLoaded;
@@ -46,8 +55,14 @@ export default function RootLayout() {
     if (!fontsLoaded) return;
 
     const defaultFontStyle = { fontFamily: Fonts.sans };
-    Text.defaultProps = { ...(Text.defaultProps ?? {}), style: defaultFontStyle };
-    TextInput.defaultProps = { ...(TextInput.defaultProps ?? {}), style: defaultFontStyle };
+    TextWithDefaultProps.defaultProps = {
+      ...(TextWithDefaultProps.defaultProps ?? {}),
+      style: defaultFontStyle,
+    };
+    TextInputWithDefaultProps.defaultProps = {
+      ...(TextInputWithDefaultProps.defaultProps ?? {}),
+      style: defaultFontStyle,
+    };
     SplashScreen.hideAsync();
   }, [fontsLoaded]);
 

@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import type { ReactNode } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { BellOnIcon, ScheduleIcon } from '@/components/medical-ui-icons';
+import { BellOnIcon, PillIcon, ScheduleIcon } from '@/components/medical-ui-icons';
 import type { AppLabels } from '@/constants/i18n';
 import { Fonts } from '@/constants/theme';
 import { useAppChromeTheme } from '@/hooks/use-app-chrome-theme';
@@ -80,9 +80,26 @@ export function MedicationIntakeLegendModal({ visible, labels, onClose }: Props)
             iconWrapStyle={styles.timeSampleIconWrap}
           />
           <LegendRow
-            icon={<Text style={[styles.legendNumberSample, { color: theme.textSecondary }]}>3</Text>}
-            text={labels.medicationIntakeLegendNumber}
+            icon={
+              <View style={styles.pillSample}>
+                <PillIcon size={16} color={theme.textSecondary} />
+                <Text style={[styles.legendNumberSample, { color: theme.textSecondary }]}>x/y</Text>
+              </View>
+            }
+            text={labels.medicationIntakeLegendNumberPack}
             textColor={theme.text}
+            iconWrapStyle={styles.pillSampleIconWrap}
+          />
+          <LegendRow
+            icon={
+              <View style={styles.pillSample}>
+                <PillIcon size={16} color={theme.textSecondary} />
+                <Text style={[styles.legendNumberSample, { color: theme.textSecondary }]}>x</Text>
+              </View>
+            }
+            text={labels.medicationIntakeLegendNumberDose}
+            textColor={theme.text}
+            iconWrapStyle={styles.pillSampleIconWrap}
           />
         </Pressable>
       </Pressable>
@@ -142,6 +159,14 @@ const styles = StyleSheet.create({
   timeSampleIconWrap: {
     width: 40,
   },
+  pillSampleIconWrap: {
+    width: 56,
+  },
+  pillSample: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
   takeButtonSample: {
     minHeight: 28,
     borderRadius: 8,
@@ -170,9 +195,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   legendNumberSample: {
-    fontSize: 18,
+    fontSize: 13,
     fontFamily: Fonts.mono,
-    lineHeight: 22,
+    lineHeight: 16,
     fontWeight: '700',
   },
   pressed: {

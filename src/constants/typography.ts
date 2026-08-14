@@ -80,7 +80,7 @@ export const sectionTitleStyle: TextStyle = {
 };
 
 /** Sage-aligned section label — pair with theme.textSecondary when overriding. */
-export const daySectionLabelColor = '#5A6B62';
+export const daySectionLabelColor = '#2C3654';
 
 export const daySectionLabelStyle: TextStyle = {
   ...sectionTitleStyle,

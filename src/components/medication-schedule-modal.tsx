@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import type { Locale } from 'date-fns';
 import { addMonths, format, parse } from 'date-fns';
-import { useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Image } from 'expo-image';
+import { useMemo, useState, type ReactNode } from 'react';
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
 import { MedicationDatePickerModal } from '@/components/medication-date-picker-modal';
 import { MedicationIntakeDaysModal } from '@/components/medication-intake-days-modal';
@@ -11,7 +12,6 @@ import { formatTimeValue, MedicationTimePickerModal, parseTimeValue } from '@/co
 import type { AppLabels } from '@/constants/i18n';
 import { Fonts } from '@/constants/theme';
 import {
-  dayMedicationsHeaderStyle,
   formatSectionTitle,
   weekBodyTextStyle,
   weekCardTitleStyle,
@@ -55,12 +55,69 @@ type Props = {
 
 type DatePickerTarget = 'start' | 'end';
 
+const DECOR = {
+  name: require('@/assets/images/schedule-name-decor.png'),
+  dose: require('@/assets/images/schedule-dose-decor.png'),
+  day: require('@/assets/images/schedule-day-decor.png'),
+  time: require('@/assets/images/schedule-time-decor.png'),
+  reminder: require('@/assets/images/schedule-reminder-decor.png'),
+  duration: require('@/assets/images/schedule-duration-decor.png'),
+} as const;
+
+const ACCENT = {
+  name: { label: '#9B8EC4', blockBg: '#F7F4FC' },
+  dose: { label: '#9B8EC4' },
+  day: { label: '#5FA88A', blockBg: '#F3FAF6' },
+  time: { label: '#6A9BC4', blockBg: '#F3F8FC' },
+  reminder: { label: '#D08A6A', blockBg: '#FCF6F2' },
+  duration: { label: '#7A92C4', blockBg: '#F4F7FC' },
+} as const;
+
+const WHITE_BOX = {
+  borderColor: '#FFFFFF',
+  backgroundColor: '#FFFFFF',
+} as const;
+
 function normalizeTimeLabel(time: string): string {
   return formatTimeValue(parseTimeValue(time));
 }
 
 function getInitialLocalTimes(times: string[]): string[] {
   return times.length > 0 ? times.map((time) => (time.trim() ? normalizeTimeLabel(time) : '')) : [''];
+}
+
+function ScheduleRow({
+  source,
+  label,
+  labelColor,
+  children,
+  last,
+  flushBottom,
+  flushRight,
+}: {
+  source: number;
+  label: string;
+  labelColor: string;
+  children: ReactNode;
+  last?: boolean;
+  flushBottom?: boolean;
+  flushRight?: boolean;
+}) {
+  return (
+    <View
+      style={[
+        styles.fieldRow,
+        flushBottom && styles.fieldRowFlushBottom,
+        flushRight && styles.fieldRowFlushRight,
+        !last && styles.fieldRowBorder,
+      ]}>
+      <Image source={source} style={styles.decorImage} contentFit="contain" accessibilityIgnoresInvertColors />
+      <View style={styles.fieldContent}>
+        <Text style={[styles.fieldLabel, { color: labelColor }]}>{label}</Text>
+        {children}
+      </View>
+    </View>
+  );
 }
 
 export function MedicationScheduleModal({
@@ -201,6 +258,21 @@ export function MedicationScheduleModal({
     onClose();
   };
 
+  const handleDeletePress = () => {
+    Alert.alert(
+      labels.medicationScheduleDeleteConfirmTitle,
+      labels.medicationScheduleDeleteConfirmMessage,
+      [
+        { text: labels.repeatCancel, style: 'cancel' },
+        {
+          text: labels.medicationScheduleDelete,
+          style: 'destructive',
+          onPress: onDelete,
+        },
+      ],
+    );
+  };
+
   return (
     <>
       <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
@@ -215,28 +287,21 @@ export function MedicationScheduleModal({
               <Text style={[styles.title, { color: theme.text }]}>
                 {formatSectionTitle(labels.medicationScheduleTitle)}
               </Text>
-              <Pressable
-                onPress={onClose}
-                hitSlop={8}
-                style={({ pressed }) => [styles.headerSide, styles.headerSideEnd, pressed && styles.pressed]}>
-                <Ionicons name="close" size={20} color={theme.text} />
-              </Pressable>
+              <View style={styles.headerSide} />
             </View>
 
             <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
               <View
                 style={[
-                  styles.panel,
-                  { backgroundColor: chrome.notesBlockBg, borderColor: chrome.dayBorder },
+                  styles.fieldsCard,
+                  styles.fieldsCardFlushBottom,
+                  { backgroundColor: ACCENT.name.blockBg, borderColor: chrome.dayBorder },
                 ]}>
-                <View
-                  style={[
-                    styles.panelHeader,
-                    { backgroundColor: theme.sectionLabelBg, borderColor: theme.rowBorder },
-                  ]}>
-                  <Text style={styles.panelHeaderText}>{formatSectionTitle(labels.medicationName)}</Text>
-                </View>
-                <View style={[styles.panelBody, { backgroundColor: theme.inactiveBg, borderColor: theme.rowBorder }]}>
+                <ScheduleRow
+                  source={DECOR.name}
+                  label={formatSectionTitle(labels.medicationName)}
+                  labelColor={ACCENT.name.label}
+                  flushRight>
                   <TextInput
                     value={localName}
                     onChangeText={(name) => {
@@ -245,19 +310,24 @@ export function MedicationScheduleModal({
                     }}
                     placeholder={`... ${labels.medicationName}`}
                     placeholderTextColor={theme.iconMuted}
-                    style={[styles.panelInput, { color: chrome.medicationFieldText }]}
+                    multiline
+                    scrollEnabled={false}
+                    style={[
+                      styles.fieldInput,
+                      styles.fieldInputBoxed,
+                      WHITE_BOX,
+                      { color: chrome.medicationFieldText },
+                    ]}
                   />
-                </View>
-                <View
-                  style={[
-                    styles.panelHeader,
-                    { backgroundColor: theme.sectionLabelBg, borderColor: theme.rowBorder },
-                  ]}>
-                  <Text style={styles.panelHeaderText}>
-                    {formatSectionTitle(labels.medicationScheduleDose)}
-                  </Text>
-                </View>
-                <View style={[styles.panelBodyLast, { backgroundColor: theme.inactiveBg }]}>
+                </ScheduleRow>
+
+                <ScheduleRow
+                  source={DECOR.dose}
+                  label={formatSectionTitle(labels.medicationScheduleDose)}
+                  labelColor={ACCENT.dose.label}
+                  last
+                  flushBottom
+                  flushRight>
                   <TextInput
                     value={localDose}
                     onChangeText={(dose) => {
@@ -266,118 +336,191 @@ export function MedicationScheduleModal({
                     }}
                     placeholder={labels.medicationDose}
                     placeholderTextColor={theme.iconMuted}
-                    style={[styles.panelInput, { color: chrome.medicationFieldText }]}
+                    multiline
+                    scrollEnabled={false}
+                    style={[
+                      styles.fieldInput,
+                      styles.fieldInputBoxed,
+                      WHITE_BOX,
+                      { color: chrome.medicationFieldText },
+                    ]}
                   />
-                </View>
+                </ScheduleRow>
               </View>
 
               <View
                 style={[
-                  styles.panel,
-                  { backgroundColor: chrome.notesBlockBg, borderColor: chrome.dayBorder },
+                  styles.fieldsCard,
+                  styles.fieldsCardFlushBottom,
+                  { backgroundColor: ACCENT.day.blockBg, borderColor: chrome.dayBorder },
                 ]}>
-                <View
-                  style={[
-                    styles.panelHeader,
-                    { backgroundColor: theme.sectionLabelBg, borderColor: theme.rowBorder },
-                  ]}>
-                  <Text style={styles.panelHeaderText}>
-                    {formatSectionTitle(labels.medicationScheduleDays)}
-                  </Text>
-                </View>
-                <Pressable
-                  onPress={() => setShowIntakeDaysPicker(true)}
-                  style={({ pressed }) => [
-                    styles.sheetRow,
-                    { backgroundColor: theme.inactiveBg, borderColor: theme.rowBorder },
-                    pressed && styles.pressed,
-                  ]}>
-                  <Text style={[styles.sheetRowValue, { color: theme.inactiveText }]}>{localIntakeSummary}</Text>
-                  <View style={styles.sheetRowTrailing}>
-                    <Text style={[styles.sheetRowMeta, { color: theme.activeBg }]}>
-                      {labels.medicationScheduleChange}
+                <ScheduleRow
+                  source={DECOR.day}
+                  label={formatSectionTitle(labels.medicationScheduleDays)}
+                  labelColor={ACCENT.day.label}
+                  last
+                  flushBottom
+                  flushRight>
+                  <Pressable
+                    onPress={() => setShowIntakeDaysPicker(true)}
+                    style={({ pressed }) => [
+                      styles.inlineActionRow,
+                      styles.fieldInputBoxed,
+                      WHITE_BOX,
+                      pressed && styles.pressed,
+                    ]}>
+                    <Text style={[styles.fieldValue, { color: theme.inactiveText }]} numberOfLines={2}>
+                      {localIntakeSummary}
                     </Text>
-                    <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />
-                  </View>
-                </Pressable>
+                    <View style={styles.sheetRowTrailing}>
+                      <Text style={[styles.changeLink, { color: theme.textSecondary }]}>
+                        {labels.medicationScheduleChange}
+                      </Text>
+                      <Ionicons name="chevron-forward" size={14} color={theme.textSecondary} />
+                    </View>
+                  </Pressable>
+                </ScheduleRow>
+              </View>
 
-                <View
-                  style={[
-                    styles.panelHeader,
-                    { backgroundColor: theme.sectionLabelBg, borderColor: theme.rowBorder },
-                  ]}>
-                  <Text style={styles.panelHeaderText}>
-                    {formatSectionTitle(labels.medicationScheduleTime)}
-                  </Text>
-                </View>
-                {localTimes.map((entryTime, index) => (
+              <View
+                style={[
+                  styles.fieldsCard,
+                  styles.fieldsCardFlushBottom,
+                  { backgroundColor: ACCENT.time.blockBg, borderColor: chrome.dayBorder },
+                ]}>
+                <ScheduleRow
+                  source={DECOR.time}
+                  label={formatSectionTitle(labels.medicationScheduleTime)}
+                  labelColor={ACCENT.time.label}
+                  last
+                  flushBottom
+                  flushRight>
+                  <View style={styles.timesBlock}>
+                    {localTimes.map((entryTime, index) => (
+                      <View key={`${entryTime}-${index}`} style={styles.timeRow}>
+                        {localTimes.length > 1 ? (
+                          <Pressable
+                            onPress={() => removeTime(index)}
+                            hitSlop={6}
+                            style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]}>
+                            <Ionicons name="remove-circle-outline" size={16} color={theme.textSecondary} />
+                          </Pressable>
+                        ) : null}
+                        <Pressable
+                          onPress={() => setTimePickerIndex(index)}
+                          style={({ pressed }) => [
+                            styles.timeChip,
+                            WHITE_BOX,
+                            pressed && styles.pressed,
+                          ]}>
+                          {entryTime.trim() ? (
+                            <Text style={[styles.timeText, { color: chrome.medicationFieldText }]}>{entryTime}</Text>
+                          ) : (
+                            <Ionicons name="time-outline" size={20} color={theme.iconMuted} />
+                          )}
+                          <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />
+                        </Pressable>
+                      </View>
+                    ))}
+                    <Pressable
+                      onPress={addTime}
+                      style={({ pressed }) => [styles.addTimeBtn, pressed && styles.pressed]}>
+                      <Ionicons name="add" size={14} color={ACCENT.time.label} />
+                      <Text style={[styles.addTimeText, { color: ACCENT.time.label }]}>
+                        {labels.medicationScheduleAddTime}
+                      </Text>
+                    </Pressable>
+                  </View>
+                </ScheduleRow>
+              </View>
+
+              <View
+                style={[
+                  styles.fieldsCard,
+                  styles.fieldsCardFlushBottom,
+                  { backgroundColor: ACCENT.duration.blockBg, borderColor: chrome.dayBorder },
+                ]}>
+                <ScheduleRow
+                  source={DECOR.duration}
+                  label={formatSectionTitle(labels.medicationScheduleDuration)}
+                  labelColor={ACCENT.duration.label}
+                  last
+                  flushBottom
+                  flushRight>
+                  <View style={styles.durationBlock}>
+                    <Pressable
+                      onPress={() => setDatePickerTarget('start')}
+                      style={({ pressed }) => [
+                        styles.durationRow,
+                        styles.fieldInputBoxed,
+                        WHITE_BOX,
+                        pressed && styles.pressed,
+                      ]}>
+                      <Text style={[styles.fieldValue, { color: theme.inactiveText }]}>
+                        {durationDates.startLabel}
+                      </Text>
+                      <View style={styles.sheetRowTrailing}>
+                        <Text style={[styles.changeLink, { color: theme.textSecondary }]}>
+                          {labels.medicationScheduleStart}
+                        </Text>
+                        <Ionicons name="chevron-forward" size={14} color={theme.textSecondary} />
+                      </View>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => setDatePickerTarget('end')}
+                      style={({ pressed }) => [
+                        styles.durationRow,
+                        styles.fieldInputBoxed,
+                        WHITE_BOX,
+                        pressed && styles.pressed,
+                      ]}>
+                      <Text
+                        style={[
+                          styles.fieldValue,
+                          {
+                            color: durationDates.endIsNone ? theme.textSecondary : theme.inactiveText,
+                          },
+                        ]}>
+                        {durationDates.endLabel}
+                      </Text>
+                      <View style={styles.sheetRowTrailing}>
+                        <Text style={[styles.changeLink, { color: theme.textSecondary }]}>
+                          {labels.medicationScheduleEnd}
+                        </Text>
+                        <Ionicons name="chevron-forward" size={14} color={theme.textSecondary} />
+                      </View>
+                    </Pressable>
+                  </View>
+                </ScheduleRow>
+              </View>
+
+              <View
+                style={[
+                  styles.fieldsCard,
+                  styles.fieldsCardFlushBottom,
+                  { backgroundColor: ACCENT.reminder.blockBg, borderColor: chrome.dayBorder },
+                ]}>
+                <ScheduleRow
+                  source={DECOR.reminder}
+                  label={formatSectionTitle(labels.medicationScheduleReminder)}
+                  labelColor={ACCENT.reminder.label}
+                  last
+                  flushBottom
+                  flushRight>
                   <View
-                    key={`${entryTime}-${index}`}
-                    style={[styles.sheetRow, { backgroundColor: theme.inactiveBg, borderColor: theme.rowBorder }]}>
-                    <Pressable
-                      onPress={() => removeTime(index)}
-                      disabled={localTimes.length <= 1}
-                      hitSlop={6}
-                      style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]}>
-                      <Ionicons
-                        name="remove-circle-outline"
-                        size={16}
-                        color={localTimes.length <= 1 ? theme.inactiveBorder : theme.textSecondary}
-                      />
-                    </Pressable>
-                    <Pressable
-                      onPress={() => setTimePickerIndex(index)}
-                      style={({ pressed }) => [styles.timeBtn, pressed && styles.pressed]}>
-                      {entryTime.trim() ? (
-                        <Text style={[styles.timeText, { color: chrome.medicationFieldText }]}>{entryTime}</Text>
+                    style={[
+                      styles.reminderRow,
+                      styles.fieldInputBoxed,
+                      WHITE_BOX,
+                      { opacity: hasReminderTime ? 1 : 0.45 },
+                    ]}>
+                    <View style={styles.reminderIconWrap}>
+                      {localReminderEnabled && hasReminderTime ? (
+                        <BellOnIcon size={22} color={theme.text} />
                       ) : (
-                        <Ionicons name="time-outline" size={22} color={theme.iconMuted} />
+                        <BellOffIcon size={22} color={theme.text} />
                       )}
-                      <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />
-                    </Pressable>
-                  </View>
-                ))}
-                <Pressable
-                  onPress={addTime}
-                  style={({ pressed }) => [
-                    styles.sheetRow,
-                    { backgroundColor: theme.inactiveBg, borderColor: theme.rowBorder },
-                    pressed && styles.pressed,
-                  ]}>
-                  <View style={styles.iconBtn}>
-                    <Ionicons name="add-circle-outline" size={16} color={theme.activeBg} />
-                  </View>
-                  <Text style={[styles.addTimeText, { color: theme.activeBg }]}>
-                    {labels.medicationScheduleAddTime}
-                  </Text>
-                </Pressable>
-
-                <View
-                  style={[
-                    styles.panelHeader,
-                    { backgroundColor: theme.sectionLabelBg, borderColor: theme.rowBorder },
-                  ]}>
-                  <Text style={styles.panelHeaderText}>
-                    {formatSectionTitle(labels.medicationScheduleReminder)}
-                  </Text>
-                </View>
-                <View
-                  style={[
-                    styles.reminderRow,
-                    {
-                      backgroundColor: theme.inactiveBg,
-                      borderColor: theme.rowBorder,
-                      opacity: hasReminderTime ? 1 : 0.45,
-                    },
-                  ]}>
-                  <View style={styles.reminderIconWrap}>
-                    {localReminderEnabled && hasReminderTime ? (
-                      <BellOnIcon size={24} color={theme.text} />
-                    ) : (
-                      <BellOffIcon size={24} color={theme.text} />
-                    )}
-                  </View>
-                  <View style={styles.reminderTextWrap}>
+                    </View>
                     <Text
                       style={[
                         styles.reminderStatus,
@@ -394,63 +537,39 @@ export function MedicationScheduleModal({
                           : labels.medicationScheduleReminderOff
                         : labels.reminderHint}
                     </Text>
+                    <Switch
+                      value={localReminderEnabled && hasReminderTime}
+                      onValueChange={handleUpdateReminder}
+                      disabled={!hasReminderTime}
+                      trackColor={{ false: theme.inactiveBorder, true: theme.activeBg }}
+                      thumbColor="#FFFFFF"
+                      ios_backgroundColor={theme.inactiveBorder}
+                    />
                   </View>
-                  <Switch
-                    value={localReminderEnabled && hasReminderTime}
-                    onValueChange={handleUpdateReminder}
-                    disabled={!hasReminderTime}
-                    trackColor={{ false: theme.inactiveBorder, true: theme.activeBg }}
-                    thumbColor="#FFFFFF"
-                    ios_backgroundColor={theme.inactiveBorder}
-                  />
-                </View>
-
-                <View
-                  style={[
-                    styles.panelHeader,
-                    { backgroundColor: theme.sectionLabelBg, borderColor: theme.rowBorder },
-                  ]}>
-                  <Text style={styles.panelHeaderText}>
-                    {formatSectionTitle(labels.medicationScheduleDuration)}
-                  </Text>
-                </View>
-                <Pressable
-                  onPress={() => setDatePickerTarget('start')}
-                  style={({ pressed }) => [
-                    styles.sheetRow,
-                    { backgroundColor: theme.inactiveBg, borderColor: theme.rowBorder },
-                    pressed && styles.pressed,
-                  ]}>
-                  <Text style={[styles.sheetRowValue, { color: theme.inactiveText }]}>{durationDates.startLabel}</Text>
-                  <View style={styles.sheetRowTrailing}>
-                    <Text style={[styles.sheetRowMeta, { color: theme.activeBg }]}>
-                      {labels.medicationScheduleStart}
-                    </Text>
-                    <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />
-                  </View>
-                </Pressable>
-                <Pressable
-                  onPress={() => setDatePickerTarget('end')}
-                  style={({ pressed }) => [
-                    styles.sheetRowLast,
-                    { backgroundColor: theme.inactiveBg },
-                    pressed && styles.pressed,
-                  ]}>
-                  <Text
-                    style={[
-                      styles.sheetRowValue,
-                      { color: durationDates.endIsNone ? theme.textSecondary : theme.inactiveText },
-                    ]}>
-                    {durationDates.endLabel}
-                  </Text>
-                  <View style={styles.sheetRowTrailing}>
-                    <Text style={[styles.sheetRowMeta, { color: theme.activeBg }]}>
-                      {labels.medicationScheduleEnd}
-                    </Text>
-                    <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />
-                  </View>
-                </Pressable>
+                </ScheduleRow>
               </View>
+
+              {isCreate ? null : (
+                <View style={styles.deleteRow}>
+                  <Image
+                    source={require('@/assets/images/ic-delete.png')}
+                    style={styles.deleteIcon}
+                    contentFit="contain"
+                    accessibilityIgnoresInvertColors
+                  />
+                  <Pressable
+                    onPress={handleDeletePress}
+                    style={({ pressed }) => [
+                      styles.deleteButton,
+                      { borderColor: '#C46B6B' },
+                      pressed && styles.pressed,
+                    ]}>
+                    <Text style={[styles.deleteButtonText, { color: '#C46B6B' }]}>
+                      {labels.medicationScheduleDelete}
+                    </Text>
+                  </Pressable>
+                </View>
+              )}
             </ScrollView>
 
             <View style={[styles.footer, { borderTopColor: theme.subtlePanelBorder, backgroundColor: theme.modalBg }]}>
@@ -466,17 +585,9 @@ export function MedicationScheduleModal({
                   },
                   pressed && styles.pressed,
                 ]}>
+                <Ionicons name="checkmark-circle" size={20} color={theme.activeText} />
                 <Text style={[styles.doneButtonText, { color: theme.activeText }]}>{labels.done}</Text>
               </Pressable>
-              {isCreate ? null : (
-                <Pressable
-                  onPress={onDelete}
-                  style={({ pressed }) => [styles.deleteButton, pressed && styles.pressed]}>
-                  <Text style={[styles.deleteButtonText, { color: theme.textSecondary }]}>
-                    {labels.medicationScheduleDelete}
-                  </Text>
-                </Pressable>
-              )}
             </View>
 
             <MedicationIntakeDaysModal
@@ -583,7 +694,6 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
   },
   headerSide: { minWidth: 36 },
-  headerSideEnd: { alignItems: 'flex-end' },
   title: {
     ...weekCardTitleStyle,
     fontWeight: '700',
@@ -595,110 +705,151 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     gap: 12,
   },
-  panel: {
+  fieldsCard: {
     borderWidth: 1,
-    borderRadius: 8,
+    borderRadius: 16,
     overflow: 'hidden',
+    paddingVertical: 4,
   },
-  panelHeader: {
+  fieldsCardFlushBottom: {
+    paddingBottom: 2,
+  },
+  fieldRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderBottomWidth: 1,
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 6,
+    gap: 12,
+    paddingLeft: 2,
+    paddingRight: 12,
+    paddingVertical: 12,
+    minHeight: 88,
   },
-  panelHeaderText: {
-    ...dayMedicationsHeaderStyle,
+  fieldRowFlushBottom: {
+    paddingBottom: 2,
   },
-  panelBody: {
-    borderBottomWidth: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+  fieldRowFlushRight: {
+    paddingRight: 2,
   },
-  panelBodyLast: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+  fieldRowBorder: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(138,155,210,0.22)',
   },
-  panelInput: {
+  decorImage: {
+    width: 76,
+    height: 76,
+  },
+  fieldContent: {
+    flex: 1,
+    gap: 4,
+    minWidth: 0,
+  },
+  fieldLabel: {
+    fontSize: 12,
+    fontFamily: Fonts.sansSemiBold,
+    fontWeight: '600',
+  },
+  fieldInput: {
     ...weekBodyTextStyle,
     fontFamily: Fonts.sansSemiBold,
     fontWeight: '600',
-    lineHeight: 20,
+    lineHeight: 22,
     paddingVertical: 0,
     paddingHorizontal: 0,
   },
-  sheetRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    borderBottomWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+  fieldInputBoxed: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    minHeight: 42,
+    textAlignVertical: 'top',
   },
-  sheetRowLast: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  sheetRowValue: {
+  fieldValue: {
     ...weekBodyTextStyle,
     flex: 1,
     fontFamily: Fonts.sansSemiBold,
     fontWeight: '600',
   },
-  sheetRowMeta: {
-    ...weekServiceTextStyle,
+  inlineActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   sheetRowTrailing: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
+    flexShrink: 0,
+  },
+  changeLink: {
+    ...weekServiceTextStyle,
+    letterSpacing: 0.4,
+    textTransform: 'none',
+    fontSize: 12,
+  },
+  timesBlock: {
+    gap: 8,
+  },
+  timeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  timeChip: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    minHeight: 42,
+  },
+  timeText: {
+    ...weekBodyTextStyle,
+    fontFamily: Fonts.sansSemiBold,
+    fontWeight: '600',
+  },
+  addTimeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    alignSelf: 'flex-start',
+    paddingTop: 2,
   },
   addTimeText: {
-    ...weekBodyTextStyle,
-    flex: 1,
+    fontSize: 13,
     fontFamily: Fonts.sansSemiBold,
     fontWeight: '600',
   },
   reminderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    borderBottomWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    gap: 10,
   },
   reminderIconWrap: {
-    width: 24,
+    width: 22,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  reminderTextWrap: {
-    flex: 1,
   },
   reminderStatus: {
     ...weekServiceTextStyle,
-  },
-  iconBtn: {
-    width: 24,
-    height: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  timeBtn: {
     flex: 1,
+    letterSpacing: 0.6,
+  },
+  durationBlock: {
+    gap: 8,
+  },
+  durationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
+    gap: 8,
   },
-  timeText: {
-    ...weekBodyTextStyle,
-    fontFamily: Fonts.sansSemiBold,
-    fontWeight: '600',
+  iconBtn: {
+    width: 22,
+    height: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   footer: {
     paddingHorizontal: 16,
@@ -708,9 +859,11 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   doneButton: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 12,
+    gap: 8,
+    borderRadius: 14,
     borderWidth: 1,
     paddingVertical: 14,
   },
@@ -721,10 +874,22 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     textTransform: 'uppercase',
   },
+  deleteRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  deleteIcon: {
+    width: 46,
+    height: 46,
+  },
   deleteButton: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 14,
+    borderWidth: 1,
   },
   deleteButtonText: {
     fontSize: 12,
