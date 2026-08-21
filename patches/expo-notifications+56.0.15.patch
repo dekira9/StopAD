@@ -1,0 +1,50 @@
+diff --git a/node_modules/expo-notifications/android/src/main/java/expo/modules/notifications/notifications/channels/NotificationChannelManagerModule.kt b/node_modules/expo-notifications/android/src/main/java/expo/modules/notifications/notifications/channels/NotificationChannelManagerModule.kt
+index 4c6eb52..ceb2e98 100644
+--- a/node_modules/expo-notifications/android/src/main/java/expo/modules/notifications/notifications/channels/NotificationChannelManagerModule.kt
++++ b/node_modules/expo-notifications/android/src/main/java/expo/modules/notifications/notifications/channels/NotificationChannelManagerModule.kt
+@@ -1,11 +1,15 @@
+ package expo.modules.notifications.notifications.channels
+ 
++import android.content.Context
+ import android.os.Build
+ import android.os.Bundle
+ import androidx.annotation.RequiresApi
+ import expo.modules.core.arguments.ReadableArguments
+ import expo.modules.kotlin.modules.Module
+ import expo.modules.kotlin.modules.ModuleDefinition
++import expo.modules.notifications.notifications.channels.managers.AndroidXNotificationsChannelGroupManager
++import expo.modules.notifications.notifications.channels.managers.AndroidXNotificationsChannelManager
++import expo.modules.notifications.notifications.channels.serializers.ExpoNotificationsChannelSerializer
+ import expo.modules.notifications.notifications.channels.serializers.NotificationsChannelSerializer
+ import expo.modules.notifications.notifications.enums.NotificationImportance
+ import java.util.Objects
+@@ -13,12 +17,15 @@ import java.util.Objects
+ /**
+  * An exported module responsible for exposing methods for managing notification channels.
+  */
+-open class NotificationChannelManagerModule : Module(), NotificationsChannelProviderAccessor {
++open class NotificationChannelManagerModule : Module() {
++  private val groupManager by lazy {
++    AndroidXNotificationsChannelGroupManager(requireAndroidContext())
++  }
+   private val channelManager by lazy {
+-    getChannelProvider(appContext.registry).channelManager
++    AndroidXNotificationsChannelManager(requireAndroidContext(), groupManager)
+   }
+   private val channelSerializer by lazy {
+-    getChannelProvider(appContext.registry).channelSerializer
++    ExpoNotificationsChannelSerializer()
+   }
+ 
+   override fun definition() = ModuleDefinition {
+@@ -69,6 +76,10 @@ open class NotificationChannelManagerModule : Module(), NotificationsChannelProv
+     }
+   }
+ 
++  private fun requireAndroidContext(): Context {
++    return requireNotNull(appContext.reactContext) { "React context is not available" }
++  }
++
+   private fun getNameFromOptions(channelOptions: ReadableArguments): CharSequence {
+     return channelOptions.getString(NotificationsChannelSerializer.NAME_KEY)
+   }

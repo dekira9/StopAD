@@ -10,7 +10,7 @@ import { MedicationStockEditModal } from '@/components/medication-stock-edit-mod
 import { MedicationStockModal } from '@/components/medication-stock-modal';
 import type { AppLabels } from '@/constants/i18n';
 import { Fonts } from '@/constants/theme';
-import { formatSectionTitle, weekButtonTextStyle, weekDayTitleStyle, weekServiceTextStyle } from '@/constants/typography';
+import { formatSectionTitle, weekButtonTextStyle, weekCardTitleStyle, weekDayTitleStyle, weekServiceTextStyle } from '@/constants/typography';
 import { useAppChromeTheme } from '@/hooks/use-app-chrome-theme';
 import {
   formatMedicationLabel,
@@ -170,7 +170,7 @@ function AllMedicationsModalShell({
             onPress={() => onOpenSchedule(entry)}
             style={({ pressed }) => [
               styles.actionBtn,
-              { borderColor: theme.inactiveBorder },
+              { borderColor: theme.inactiveBorder, backgroundColor: 'rgba(224,240,234,0.34)' },
               pressed && styles.pressed,
             ]}>
             <ScheduleIcon size={22} color={theme.text} />
@@ -183,7 +183,7 @@ function AllMedicationsModalShell({
             onPress={() => setStockTarget(entry)}
             style={({ pressed }) => [
               styles.actionBtn,
-              { borderColor: theme.inactiveBorder },
+              { borderColor: theme.inactiveBorder, backgroundColor: 'rgba(252,236,216,0.34)' },
               pressed && styles.pressed,
             ]}>
             <MedicineBottleIcon size={22} color={theme.text} />
@@ -325,7 +325,7 @@ function AllMedicationsModalShell({
                       styles.addIconCircle,
                       { backgroundColor: theme.inactiveBg, borderColor: theme.activeBg },
                     ]}>
-                    <Ionicons name="add" size={16} color={theme.activeBg} />
+                    <Ionicons name="add" size={14} color={theme.activeBg} />
                   </View>
                   <Text style={[styles.addButtonText, { color: theme.activeBg }]}>{labels.addMedication}</Text>
                 </Pressable>
@@ -470,7 +470,11 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   headerBtn: { minWidth: 28, alignItems: 'flex-end' },
-  title: { ...weekDayTitleStyle, textAlign: 'center' },
+  title: {
+    ...weekCardTitleStyle,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
   blurTarget: {
     flex: 1,
     minHeight: 0,
@@ -576,7 +580,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     borderWidth: 1,
-    borderRadius: 12,
+    borderRadius: 999,
+    minHeight: 48,
     paddingVertical: 14,
     shadowColor: '#000',
     shadowRadius: 4,
@@ -584,9 +589,9 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   addIconCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
@@ -602,8 +607,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    borderRadius: 12,
+    borderRadius: 999,
     borderWidth: 1,
+    minHeight: 48,
     paddingVertical: 14,
     shadowColor: '#000',
     shadowRadius: 4,

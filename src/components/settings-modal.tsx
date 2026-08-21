@@ -10,8 +10,10 @@ import {
   getPrivacyPolicyText,
   getSupportInfoText,
 } from '@/constants/legal-info';
+import { REMINDER_SOUND_IDS, type ReminderSoundId } from '@/constants/reminder-sounds';
 import { weekBodyTextStyle, weekButtonTextStyle, weekCardTitleStyle } from '@/constants/typography';
 import { useAppChromeTheme } from '@/hooks/use-app-chrome-theme';
+import { playReminderSoundPreview } from '@/utils/reminder-sound';
 
 type Props = {
   visible: boolean;
@@ -21,7 +23,10 @@ type Props = {
   onReviewModeChange: (value: boolean) => void;
   onLanguageChange: (language: Language) => void;
   onEnableReminders: () => void;
+  reminderSound: ReminderSoundId;
+  onReminderSoundChange: (soundId: ReminderSoundId) => void;
   onShowOnboardingAgain: () => void;
+  onOpenUnderstandingAnxiety: () => void;
   onClose: () => void;
 };
 
@@ -35,7 +40,10 @@ export function SettingsModal({
   onReviewModeChange,
   onLanguageChange,
   onEnableReminders,
+  reminderSound,
+  onReminderSoundChange,
   onShowOnboardingAgain,
+  onOpenUnderstandingAnxiety,
   onClose,
 }: Props) {
   const insets = useSafeAreaInsets();
@@ -74,7 +82,7 @@ export function SettingsModal({
           ]}>
           <View style={styles.headerRow}>
             <View style={styles.headerBtn} />
-            <Text style={[styles.title, { color: theme.text }]}>{labels.settingsTitle}</Text>
+            <Text style={[styles.title, { color: theme.text }]}>{labels.menuButton}</Text>
             <Pressable
               onPress={onClose}
               hitSlop={8}
@@ -89,6 +97,34 @@ export function SettingsModal({
               <Text style={[styles.brandName, { color: theme.text }]}>{labels.appName}</Text>
               <Text style={[styles.brandTagline, { color: theme.textSecondary }]}>{labels.appTagline}</Text>
             </View>
+
+            <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>{labels.menuHelpSection}</Text>
+
+            <Pressable
+              onPress={onOpenUnderstandingAnxiety}
+              accessibilityLabel={labels.understandingAnxietyTitle}
+              style={({ pressed }) => [
+                styles.linkRow,
+                { backgroundColor: theme.circleBg, borderColor: theme.circleBorder },
+                pressed && styles.pressed,
+              ]}>
+              <Ionicons name="heart-outline" size={16} color={theme.icon} />
+              <Text style={[styles.linkRowText, { color: theme.text }]}>{labels.understandingAnxietyTitle}</Text>
+              <Ionicons name="chevron-forward" size={16} color={theme.iconMuted} />
+            </Pressable>
+
+            <Pressable
+              onPress={onShowOnboardingAgain}
+              accessibilityLabel={labels.showOnboardingAgain}
+              style={({ pressed }) => [
+                styles.linkRow,
+                { backgroundColor: theme.circleBg, borderColor: theme.circleBorder },
+                pressed && styles.pressed,
+              ]}>
+              <Ionicons name="school-outline" size={16} color={theme.icon} />
+              <Text style={[styles.linkRowText, { color: theme.text }]}>{labels.showOnboardingAgain}</Text>
+              <Ionicons name="chevron-forward" size={16} color={theme.iconMuted} />
+            </Pressable>
 
             <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>{labels.selectLanguage}</Text>
             <View style={styles.langList}>
@@ -116,29 +152,82 @@ export function SettingsModal({
               })}
             </View>
 
+            <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>{labels.settingsTitle}</Text>
+
             <View style={[styles.rowCard, { backgroundColor: theme.subtlePanelBg, borderColor: theme.subtlePanelBorder }]}>
               <View style={styles.rowTextWrap}>
                 <Text style={[styles.rowTitle, { color: theme.text }]}>{labels.reviewMode}</Text>
                 <Text style={[styles.rowHint, { color: theme.textSecondary }]}>{labels.reviewModeHint}</Text>
               </View>
-              <Switch value={reviewMode} onValueChange={onReviewModeChange} />
+              <Switch
+                value={reviewMode}
+                onValueChange={onReviewModeChange}
+                trackColor={{ false: theme.inactiveBorder, true: theme.activeBg }}
+                thumbColor="#FFFFFF"
+                ios_backgroundColor={theme.inactiveBorder}
+              />
             </View>
 
-            <View style={[styles.rowCard, { backgroundColor: theme.subtlePanelBg, borderColor: theme.subtlePanelBorder }]}>
-              <View style={styles.rowTextWrap}>
-                <Text style={[styles.rowTitle, { color: theme.text }]}>{labels.reminder}</Text>
-                <Text style={[styles.rowHint, { color: theme.textSecondary }]}>{labels.reminderHint}</Text>
+            <View style={[styles.reminderCard, { backgroundColor: theme.subtlePanelBg, borderColor: theme.subtlePanelBorder }]}>
+              <View style={styles.reminderTopRow}>
+                <View style={styles.rowTextWrap}>
+                  <Text style={[styles.rowTitle, { color: theme.text }]}>{labels.reminder}</Text>
+                  <Text style={[styles.rowHint, { color: theme.textSecondary }]}>{labels.reminderHint}</Text>
+                </View>
+                <Pressable
+                  onPress={onEnableReminders}
+                  accessibilityLabel={labels.configureNotifications}
+                  style={({ pressed }) => [
+                    styles.iconAction,
+                    { backgroundColor: theme.activeBg },
+                    pressed && styles.pressed,
+                  ]}>
+                  <Ionicons name="notifications-outline" size={16} color={theme.activeText} />
+                </Pressable>
               </View>
-              <Pressable
-                onPress={onEnableReminders}
-                accessibilityLabel={labels.configureNotifications}
-                style={({ pressed }) => [
-                  styles.iconAction,
-                  { backgroundColor: theme.activeBg },
-                  pressed && styles.pressed,
-                ]}>
-                <Ionicons name="notifications-outline" size={16} color={theme.activeText} />
-              </Pressable>
+
+              <View style={styles.soundBlock}>
+                <Text style={[styles.rowTitle, { color: theme.text }]}>{labels.reminderSound}</Text>
+                <Text style={[styles.rowHint, { color: theme.textSecondary }]}>{labels.reminderSoundHint}</Text>
+                <View style={styles.soundChips}>
+                  {REMINDER_SOUND_IDS.map((soundId) => {
+                    const active = reminderSound === soundId;
+                    const soundLabel =
+                      soundId === 'quiet'
+                        ? labels.reminderSoundQuiet
+                        : soundId === 'normal'
+                          ? labels.reminderSoundNormal
+                          : labels.reminderSoundNoticeable;
+                    return (
+                      <Pressable
+                        key={soundId}
+                        onPress={() => {
+                          void playReminderSoundPreview(soundId);
+                          onReminderSoundChange(soundId);
+                        }}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: active }}
+                        accessibilityLabel={soundLabel}
+                        style={({ pressed }) => [
+                          styles.soundChip,
+                          active
+                            ? { backgroundColor: theme.activeBg, borderColor: theme.activeBg }
+                            : { backgroundColor: theme.inactiveBg, borderColor: theme.inactiveBorder },
+                          pressed && styles.pressed,
+                        ]}>
+                        <Text
+                          style={[
+                            styles.soundChipText,
+                            { color: active ? theme.activeText : theme.inactiveText },
+                          ]}
+                          numberOfLines={1}>
+                          {soundLabel}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
             </View>
 
             <View style={[styles.privacyCard, { backgroundColor: theme.subtlePanelBg, borderColor: theme.subtlePanelBorder }]}>
@@ -148,6 +237,8 @@ export function SettingsModal({
               </View>
               <Text style={[styles.rowHint, { color: theme.textSecondary }]}>{labels.privacyHint}</Text>
             </View>
+
+            <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>{labels.menuAboutSection}</Text>
 
             <Pressable
               onPress={() => setLegalDoc('disclaimer')}
@@ -188,18 +279,6 @@ export function SettingsModal({
               <Ionicons name="mail-outline" size={16} color={theme.icon} />
               <Text style={[styles.linkRowText, { color: theme.text }]}>{labels.supportTitle}</Text>
               <Ionicons name="chevron-forward" size={16} color={theme.iconMuted} />
-            </Pressable>
-
-            <Pressable
-              onPress={onShowOnboardingAgain}
-              accessibilityLabel={labels.showOnboardingAgain}
-              style={({ pressed }) => [
-                styles.onboardingBtn,
-                { backgroundColor: theme.circleBg, borderColor: theme.circleBorder },
-                pressed && styles.pressed,
-              ]}>
-              <Ionicons name="school-outline" size={16} color={theme.icon} />
-              <Text style={[styles.onboardingText, { color: theme.text }]}>{labels.showOnboardingAgain}</Text>
             </Pressable>
           </ScrollView>
         </View>
@@ -296,6 +375,38 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingHorizontal: 14,
     paddingVertical: 12,
+  },
+  reminderCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    gap: 12,
+  },
+  reminderTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  soundBlock: { gap: 6 },
+  soundChips: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 4,
+  },
+  soundChip: {
+    flex: 1,
+    minHeight: 40,
+    borderRadius: 999,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+  },
+  soundChipText: {
+    ...weekButtonTextStyle,
+    fontSize: 12,
+    fontWeight: '700',
   },
   rowTextWrap: { flex: 1, gap: 2 },
   rowTitle: { ...weekCardTitleStyle, fontSize: 15 },

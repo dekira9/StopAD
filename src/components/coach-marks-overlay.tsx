@@ -91,7 +91,7 @@ export function CoachMarksOverlay({
             },
           ]}>
           <View style={styles.tooltipHeader}>
-            <Ionicons name={step === 0 ? 'pulse' : 'information-circle-outline'} size={18} color={theme.activeBg} />
+            <Ionicons name={step === 0 ? 'pulse' : 'menu-outline'} size={18} color={theme.activeBg} />
             <Text style={[styles.tooltipTitle, { color: theme.text }]}>{title}</Text>
           </View>
           <Text style={[styles.tooltipBody, { color: theme.textSecondary }]}>{body}</Text>

@@ -10,6 +10,11 @@ import { Platform } from 'react-native';
 
 import { APP_NAME } from '@/constants/brand';
 import type { Language } from '@/constants/i18n';
+import {
+  DEFAULT_REMINDER_SOUND,
+  isReminderSoundId,
+  type ReminderSoundId,
+} from '@/constants/reminder-sounds';
 import { rescheduleMedicationReminders } from '@/services/notifications';
 import { emptyGrowthRingsLog, normalizeGrowthRingsLog, type GrowthRingsLog } from '@/utils/growth-ring-log';
 import { normalizeDayLogPanicAttack } from '@/utils/panic-attack-log';
@@ -354,6 +359,7 @@ class WellnessStore {
   coachMarksSeen = false;
   weeklySummaryNudgeSeen = false;
   preferredLanguage: Language | null = null;
+  reminderSound: ReminderSoundId = DEFAULT_REMINDER_SOUND;
   hydrated = false;
   private persistQueue: Promise<void> = Promise.resolve();
   private reminderLabels: ReminderLabels = {
@@ -372,6 +378,12 @@ class WellnessStore {
 
   setPreferredLanguage(language: Language) {
     this.preferredLanguage = language;
+    this.schedulePersist();
+  }
+
+  setReminderSound(soundId: ReminderSoundId) {
+    if (this.reminderSound === soundId) return;
+    this.reminderSound = soundId;
     this.schedulePersist();
   }
 
@@ -434,6 +446,7 @@ class WellnessStore {
         coachMarksSeen?: boolean;
         weeklySummaryNudgeSeen?: boolean;
         preferredLanguage?: Language | null;
+        reminderSound?: ReminderSoundId;
       };
       const hasLocalState = Object.keys(this.days).length > 0;
 
@@ -459,6 +472,9 @@ class WellnessStore {
           this.coachMarksSeen = parsed.coachMarksSeen ?? false;
           this.weeklySummaryNudgeSeen = parsed.weeklySummaryNudgeSeen ?? false;
           this.preferredLanguage = parsed.preferredLanguage ?? null;
+          this.reminderSound = isReminderSoundId(parsed.reminderSound)
+            ? parsed.reminderSound
+            : DEFAULT_REMINDER_SOUND;
           const hasExistingDiary = Object.keys(parsed.days ?? {}).some((dateKey) => {
             const day = parsed.days?.[dateKey];
             if (!day) return false;
@@ -507,6 +523,7 @@ class WellnessStore {
       coachMarksSeen: this.coachMarksSeen,
       weeklySummaryNudgeSeen: this.weeklySummaryNudgeSeen,
       preferredLanguage: this.preferredLanguage,
+      reminderSound: this.reminderSound,
     });
 
     this.persistQueue = this.persistQueue
@@ -528,6 +545,7 @@ class WellnessStore {
       toJS(this.days),
       (med) => `${notificationBody} ${med}`,
       notificationTitle,
+      this.reminderSound,
     );
   }
 
@@ -591,6 +609,58 @@ class WellnessStore {
   getMedicationCatalogEntryByLabel(medicationName: string): MedicationCatalogEntry | undefined {
     const entry = this.findMedicationCatalogEntry(medicationName);
     return entry ? { ...entry } : undefined;
+  }
+
+  /**
+   * Remaining stock as of the end of `dateKey` for the home-screen refill hint.
+   * Reconstructs from current catalog stock plus later deductions in the same stock cycle.
+   * Past days only show the hint when a dose was deducted that day (so each count sits on its day).
+   * Returns undefined when the refill reminder should not be shown for that day.
+   */
+  getMedicationStockLeftForDate(medicationName: string, dateKey: string): number | undefined {
+    const trimmed = medicationName.trim();
+    if (!trimmed) return undefined;
+
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
+    if (dateKey > todayKey) return undefined;
+
+    const entry = this.findMedicationCatalogEntry(trimmed);
+    if (!entry) return undefined;
+    if (entry.refillReminderEnabled === false) return undefined;
+    if (typeof entry.stockCount !== 'number') return undefined;
+    if (typeof entry.refillReminderCount !== 'number') return undefined;
+
+    const lastRefillDateKey = entry.lastRefillDateKey;
+    if (lastRefillDateKey && dateKey < lastRefillDateKey) return undefined;
+
+    const cycle = entry.stockCycleVersion ?? 0;
+    const targetName = trimmed.toLowerCase();
+    let deductionsAfter = 0;
+    let deductionsOnDay = 0;
+
+    for (const currentKey of Object.keys(this.days)) {
+      if (currentKey < dateKey) continue;
+      const currentDay = this.days[currentKey];
+      if (!currentDay) continue;
+
+      for (const medicationRow of currentDay.medications) {
+        if (medicationRow.stockDeducted !== true) continue;
+        if (medicationRow.medication.trim().toLowerCase() !== targetName) continue;
+        if ((medicationRow.stockCycleVersion ?? 0) !== cycle) continue;
+        if (currentKey === dateKey) {
+          deductionsOnDay += 1;
+        } else {
+          deductionsAfter += 1;
+        }
+      }
+    }
+
+    // Past days: only the day that actually used a dose gets that day's remaining count.
+    if (dateKey < todayKey && deductionsOnDay === 0) return undefined;
+
+    const stockLeft = entry.stockCount + deductionsAfter;
+    if (stockLeft > entry.refillReminderCount) return undefined;
+    return stockLeft;
   }
 
   private findMedicationCatalogEntry(medicationName: string): MedicationCatalogEntry | undefined {

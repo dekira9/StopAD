@@ -282,6 +282,7 @@ function MedicationStockEditModalContent({
               {
                 backgroundColor: theme.activeBg,
                 borderColor: theme.activeBg,
+                shadowOpacity: theme.buttonShadow,
                 opacity: canSave ? 1 : 0.45,
               },
               pressed && styles.pressed,
@@ -466,9 +467,13 @@ const styles = StyleSheet.create({
   saveButton: {
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 12,
+    borderRadius: 999,
     borderWidth: 1,
     paddingVertical: 14,
+    shadowColor: '#000',
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
   saveButtonText: {
     fontSize: 12,

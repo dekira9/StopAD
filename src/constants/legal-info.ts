@@ -2,7 +2,7 @@ import type { Language } from '@/constants/i18n';
 import { APP_NAME } from '@/constants/brand';
 
 /** Update this when you have a real support address for store listings. */
-export const SUPPORT_EMAIL = 'support@hianxiety.app';
+export const SUPPORT_EMAIL = 'hi.anxiety.support@gmail.com';
 
 const MEDICAL_DISCLAIMER: Record<Language, string> = {
   en: `Medical disclaimer

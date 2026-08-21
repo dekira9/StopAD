@@ -1,8 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { getImportantInfoText, isImportantInfoSectionTitle } from '@/constants/important-info';
 import type { AppLabels, Language } from '@/constants/i18n';
+import {
+  getImportantInfoText,
+  isImportantInfoSectionTitle,
+  parseImportantInfoEmojiSection,
+} from '@/constants/important-info';
 import { useAppChromeTheme } from '@/hooks/use-app-chrome-theme';
 
 type Props = {
@@ -22,8 +26,12 @@ export function ImportantInfoModal({ visible, language, labels, onClose }: Props
         <View style={[styles.card, { backgroundColor: theme.modalBg, borderColor: theme.subtlePanelBorder }]}>
           <View style={styles.headerRow}>
             <View style={styles.headerBtn} />
-            <Text style={[styles.title, { color: theme.text }]}>{labels.importantInfoTitle}</Text>
-            <Pressable onPress={onClose} hitSlop={8} style={({ pressed }) => [styles.headerBtn, pressed && styles.pressed]}>
+            <View style={styles.headerTitleSpacer} />
+            <Pressable
+              onPress={onClose}
+              hitSlop={8}
+              accessibilityLabel={labels.done}
+              style={({ pressed }) => [styles.headerBtn, pressed && styles.pressed]}>
               <Ionicons name="close" size={20} color={theme.text} />
             </Pressable>
           </View>
@@ -31,6 +39,41 @@ export function ImportantInfoModal({ visible, language, labels, onClose }: Props
           <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
             {paragraphs.map((paragraph, index) => {
               const isSectionTitle = isImportantInfoSectionTitle(paragraph);
+              const emojiSection = parseImportantInfoEmojiSection(paragraph);
+
+              if (emojiSection) {
+                return (
+                  <View
+                    key={`${index}-${paragraph.slice(0, 12)}`}
+                    style={[styles.sectionBlock, { backgroundColor: theme.sectionLabelBg }]}>
+                    <Text style={[styles.sectionTitleInBlock, { color: theme.textSecondary }]}>
+                      {emojiSection.title}
+                    </Text>
+                    {emojiSection.intro ? (
+                      <Text style={[styles.bodyText, { color: theme.text }]}>{emojiSection.intro}</Text>
+                    ) : null}
+                    {emojiSection.examplesLabel ? (
+                      <Text style={[styles.examplesLabel, { color: theme.text }]}>
+                        {emojiSection.examplesLabel}
+                      </Text>
+                    ) : null}
+                    {emojiSection.examples.length > 0 ? (
+                      <View style={styles.list}>
+                        {emojiSection.examples.map((item, itemIndex) => (
+                          <View key={`${itemIndex}-${item.slice(0, 24)}`} style={styles.listItem}>
+                            <Text style={[styles.listBullet, { color: theme.text }]}>•</Text>
+                            <Text style={[styles.listItemText, { color: theme.text }]}>{item}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    ) : null}
+                    {emojiSection.outro ? (
+                      <Text style={[styles.bodyText, { color: theme.text }]}>{emojiSection.outro}</Text>
+                    ) : null}
+                  </View>
+                );
+              }
+
               return (
                 <Text
                   key={`${index}-${paragraph.slice(0, 12)}`}
@@ -46,16 +89,6 @@ export function ImportantInfoModal({ visible, language, labels, onClose }: Props
               );
             })}
           </ScrollView>
-
-          <Pressable
-            onPress={onClose}
-            style={({ pressed }) => [
-              styles.doneButton,
-              { backgroundColor: theme.activeBg, borderColor: theme.activeBg },
-              pressed && styles.pressed,
-            ]}>
-            <Text style={[styles.doneButtonText, { color: theme.activeText }]}>{labels.done}</Text>
-          </Pressable>
         </View>
       </View>
     </Modal>
@@ -79,46 +112,67 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 12,
   },
-  headerBtn: { minWidth: 28, alignItems: 'flex-end' },
-  title: {
-    flex: 1,
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-    textAlign: 'center',
+  headerBtn: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
+  headerTitleSpacer: { flex: 1 },
   scroll: { flexGrow: 0 },
-  scrollContent: { paddingHorizontal: 16, paddingBottom: 8, gap: 10 },
+  scrollContent: { paddingHorizontal: 16, paddingBottom: 16, gap: 10 },
+  sectionBlock: {
+    gap: 10,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    overflow: 'hidden',
+  },
   sectionTitle: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '800',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
+    letterSpacing: 0.6,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
     overflow: 'hidden',
     lineHeight: 16,
   },
-  bodyText: {
-    fontSize: 13,
-    lineHeight: 20,
-  },
-  doneButton: {
-    marginHorizontal: 16,
-    marginTop: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingVertical: 14,
-  },
-  doneButtonText: {
+  sectionTitleInBlock: {
     fontSize: 12,
     fontWeight: '800',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    lineHeight: 16,
+  },
+  bodyText: {
+    fontSize: 13,
+    fontWeight: '400',
+    lineHeight: 20,
+  },
+  examplesLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 20,
+  },
+  list: {
+    gap: 4,
+  },
+  listItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  listBullet: {
+    fontSize: 13,
+    lineHeight: 20,
+    width: 12,
+    textAlign: 'center',
+  },
+  listItemText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '400',
+    lineHeight: 20,
   },
   pressed: { opacity: 0.7 },
 });

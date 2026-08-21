@@ -1,27 +1,51 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useEffect, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text } from 'react-native';
 
 import type { AppLabels } from '@/constants/i18n';
 import { useAppChromeTheme } from '@/hooks/use-app-chrome-theme';
 
+export type MedicationStatusChoice = 'taken' | 'skipped' | 'cleared';
+
 type Props = {
   visible: boolean;
   labels: AppLabels;
+  /** Current mark on the row when the modal opens. */
+  initialStatus?: MedicationStatusChoice | null;
   onClose: () => void;
-  onSelectTaken: () => void;
-  onSelectSkipped: () => void;
-  onSelectCleared: () => void;
+  onConfirm: (status: MedicationStatusChoice) => void;
 };
 
 export function MedicationStatusModal({
   visible,
   labels,
+  initialStatus = null,
   onClose,
-  onSelectTaken,
-  onSelectSkipped,
-  onSelectCleared,
+  onConfirm,
 }: Props) {
   const { modal: theme } = useAppChromeTheme();
+  const [selected, setSelected] = useState<MedicationStatusChoice | null>(initialStatus ?? null);
+
+  useEffect(() => {
+    if (visible) {
+      setSelected(initialStatus ?? null);
+    }
+  }, [visible, initialStatus]);
+
+  const optionStyle = (value: MedicationStatusChoice) => {
+    const isSelected = selected === value;
+    return [
+      styles.optionRow,
+      {
+        backgroundColor: isSelected ? theme.activeBg : theme.inactiveBg,
+        borderColor: isSelected ? theme.activeBg : theme.inactiveBorder,
+      },
+    ];
+  };
+
+  const optionTextColor = (value: MedicationStatusChoice) =>
+    selected === value ? theme.activeText : theme.inactiveText;
+
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
       <Pressable style={[styles.overlay, { backgroundColor: theme.modalOverlay }]} onPress={onClose}>
@@ -31,40 +55,52 @@ export function MedicationStatusModal({
           <Text style={[styles.title, { color: theme.textSecondary }]}>{labels.medicationStatusTitle}</Text>
 
           <Pressable
-            onPress={onSelectTaken}
-            style={({ pressed }) => [
-              styles.optionRow,
-              { backgroundColor: theme.inactiveBg, borderColor: theme.inactiveBorder },
-              pressed && styles.pressed,
-            ]}>
-            <Ionicons name="checkmark" size={18} color={theme.activeBg} />
-            <Text style={[styles.optionText, { color: theme.inactiveText }]}>{labels.medicationTaken}</Text>
+            onPress={() => setSelected('taken')}
+            style={({ pressed }) => [...optionStyle('taken'), pressed && styles.pressed]}>
+            <Ionicons
+              name="checkmark"
+              size={18}
+              color={selected === 'taken' ? theme.activeText : theme.activeBg}
+            />
+            <Text style={[styles.optionText, { color: optionTextColor('taken') }]}>
+              {labels.medicationTaken}
+            </Text>
           </Pressable>
 
           <Pressable
-            onPress={onSelectSkipped}
-            style={({ pressed }) => [
-              styles.optionRow,
-              { backgroundColor: theme.inactiveBg, borderColor: theme.inactiveBorder },
-              pressed && styles.pressed,
-            ]}>
-            <Ionicons name="close" size={18} color="#ef4444" />
-            <Text style={[styles.optionText, { color: theme.inactiveText }]}>{labels.medicationSkipped}</Text>
+            onPress={() => setSelected('skipped')}
+            style={({ pressed }) => [...optionStyle('skipped'), pressed && styles.pressed]}>
+            <Ionicons
+              name="close"
+              size={18}
+              color={selected === 'skipped' ? theme.activeText : '#ef4444'}
+            />
+            <Text style={[styles.optionText, { color: optionTextColor('skipped') }]}>
+              {labels.medicationSkipped}
+            </Text>
           </Pressable>
 
           <Pressable
-            onPress={onSelectCleared}
-            style={({ pressed }) => [
-              styles.optionRow,
-              { backgroundColor: theme.inactiveBg, borderColor: theme.inactiveBorder },
-              pressed && styles.pressed,
-            ]}>
-            <Ionicons name="remove-circle-outline" size={18} color={theme.text} />
-            <Text style={[styles.optionText, { color: theme.inactiveText }]}>{labels.medicationUnmark}</Text>
+            onPress={() => setSelected('cleared')}
+            style={({ pressed }) => [...optionStyle('cleared'), pressed && styles.pressed]}>
+            <Ionicons
+              name="remove-circle-outline"
+              size={18}
+              color={selected === 'cleared' ? theme.activeText : theme.text}
+            />
+            <Text style={[styles.optionText, { color: optionTextColor('cleared') }]}>
+              {labels.medicationUnmark}
+            </Text>
           </Pressable>
 
           <Pressable
-            onPress={onClose}
+            onPress={() => {
+              if (selected) {
+                onConfirm(selected);
+              } else {
+                onClose();
+              }
+            }}
             style={({ pressed }) => [
               styles.doneButton,
               {
@@ -124,7 +160,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 12,
+    borderRadius: 999,
     borderWidth: 1,
     paddingVertical: 14,
     shadowColor: '#000',

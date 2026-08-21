@@ -178,6 +178,7 @@ function MedicationRefillReminderModalContent({
               {
                 backgroundColor: theme.activeBg,
                 borderColor: theme.activeBg,
+                shadowOpacity: theme.buttonShadow,
               },
               pressed && styles.pressed,
             ]}>
@@ -363,9 +364,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    borderRadius: 14,
+    borderRadius: 999,
     borderWidth: 1,
     paddingVertical: 14,
+    shadowColor: '#000',
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
   saveButtonText: {
     fontSize: 12,

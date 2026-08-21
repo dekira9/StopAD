@@ -14,6 +14,7 @@ import { scheduleNotificationAsync } from 'expo-notifications/build/scheduleNoti
 import { Platform } from 'react-native';
 
 import type { DayLog } from '@/stores/wellness-store';
+import { DEFAULT_REMINDER_SOUND, REMINDER_SOUND_CONFIG, type ReminderSoundId } from '@/constants/reminder-sounds';
 
 const isNative = Platform.OS !== 'web';
 
@@ -78,40 +79,50 @@ export async function rescheduleMedicationReminders(
   days: Record<string, DayLog>,
   formatBody: (medication: string) => string,
   title: string,
+  soundId: ReminderSoundId = DEFAULT_REMINDER_SOUND,
 ) {
   if (!isNative) return;
 
-  await cancelAllScheduledNotificationsAsync();
+  try {
+    await cancelAllScheduledNotificationsAsync();
 
-  const granted = await ensureNotificationPermissions();
-  if (!granted) return;
+    const granted = await ensureNotificationPermissions();
+    if (!granted) return;
 
-  const now = Date.now();
+    const config = REMINDER_SOUND_CONFIG[soundId];
 
-  for (const [dateKey, day] of Object.entries(days)) {
-    for (const row of day.medications) {
-      if (!row.reminderEnabled || !row.time?.trim() || !row.medication.trim()) continue;
+    const now = Date.now();
 
-      const parsed = parseMedicationTime(row.time);
-      if (!parsed) continue;
+    for (const [dateKey, day] of Object.entries(days)) {
+      for (const row of day.medications) {
+        if (!row.reminderEnabled || !row.time?.trim() || !row.medication.trim()) continue;
 
-      const triggerDate = new Date(
-        `${dateKey}T${String(parsed.hour).padStart(2, '0')}:${String(parsed.minute).padStart(2, '0')}:00`,
-      );
-      if (triggerDate.getTime() <= now) continue;
+        const parsed = parseMedicationTime(row.time);
+        if (!parsed) continue;
 
-      await scheduleNotificationAsync({
-        identifier: `med-${dateKey}-${row.id}`,
-        content: {
-          title,
-          body: formatBody(row.medication.trim()),
-          data: { dateKey, rowId: row.id, screen: 'today' },
-        },
-        trigger: {
-          type: SchedulableTriggerInputTypes.DATE,
-          date: triggerDate,
-        },
-      });
+        const triggerDate = new Date(
+          `${dateKey}T${String(parsed.hour).padStart(2, '0')}:${String(parsed.minute).padStart(2, '0')}:00`,
+        );
+        if (triggerDate.getTime() <= now) continue;
+
+        await scheduleNotificationAsync({
+          identifier: `med-${dateKey}-${row.id}`,
+          content: {
+            title,
+            body: formatBody(row.medication.trim()),
+            sound: config.fileName,
+            vibrate: config.vibrationPattern ?? undefined,
+            data: { dateKey, rowId: row.id, screen: 'today' },
+          },
+          trigger: {
+            type: SchedulableTriggerInputTypes.DATE,
+            date: triggerDate,
+            channelId: config.androidChannelId,
+          },
+        });
+      }
     }
+  } catch (error) {
+    console.warn('[notifications] reschedule failed', error);
   }
 }

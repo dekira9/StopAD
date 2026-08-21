@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
 
 import type { AppLabels } from '@/constants/i18n';
+import { Fonts } from '@/constants/theme';
 import { useAppSystemChromeRestore } from '@/hooks/use-system-chrome';
 import { prepareShushSound, startShushSound, stopShushSound } from '@/utils/shush-sound';
 import type { SleepLog } from '@/utils/sleep-log';
@@ -33,6 +34,43 @@ const AWAKE_TEXT = '#5c4a1c';
 const ASLEEP_BG = '#1f1f1f';
 const ASLEEP_TEXT = '#4a4a4a';
 const FINISH_ACCENT = ASLEEP_TEXT;
+const CLOCK_TEXT = '#8a7c5c';
+
+function formatClockLabel(date: Date = new Date()) {
+  return format(date, 'HH:mm');
+}
+
+function useNightClockLabel() {
+  const [label, setLabel] = useState(formatClockLabel);
+
+  useEffect(() => {
+    const tick = () => setLabel(formatClockLabel());
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return label;
+}
+
+function NightClockStrip({ label, width }: { label: string; width: number }) {
+  const fontSize = Math.round(width / 6);
+  const lineHeight = Math.round(fontSize * 1.12);
+
+  return (
+    <View
+      pointerEvents="none"
+      accessible
+      accessibilityRole="text"
+      accessibilityLabel={label}
+      style={styles.clockOverlay}>
+      {label.split('').map((char, index) => (
+        <View key={index} style={styles.clockSlot}>
+          <Text style={[styles.clockGlyph, { fontSize, lineHeight }]}>{char}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
 
 type ActiveZone = 'asleep' | 'awake' | null;
 
@@ -69,7 +107,10 @@ function CrescentMoonIcon({ size = 22, color }: { size?: number; color: string }
   );
 }
 
-/** Circle ~80% screen width with soft glow inward and outward. */
+/** Extra canvas so outer glow strokes are not clipped by the SVG viewport. */
+const GLOW_PAD = 18;
+
+/** Circle ~62% screen width with soft glow inward and outward. */
 function PressGlowRing({ size, color, visible }: { size: number; color: string; visible: boolean }) {
   const [anim] = useState(() => new Animated.Value(0));
 
@@ -82,9 +123,11 @@ function PressGlowRing({ size, color, visible }: { size: number; color: string; 
     }).start();
   }, [anim, visible]);
 
-  const cx = size / 2;
-  const cy = size / 2;
-  const r = size / 2 - 10;
+  const canvas = size + GLOW_PAD * 2;
+  const cx = canvas / 2;
+  const cy = canvas / 2;
+  // Keep the outermost stroke (r+10, width 22) inside the padded canvas.
+  const r = size / 2 - 14;
 
   return (
     <Animated.View
@@ -92,8 +135,8 @@ function PressGlowRing({ size, color, visible }: { size: number; color: string; 
       style={[
         styles.glowWrap,
         {
-          width: size,
-          height: size,
+          width: canvas,
+          height: canvas,
           opacity: anim,
           transform: [
             {
@@ -105,7 +148,7 @@ function PressGlowRing({ size, color, visible }: { size: number; color: string; 
           ],
         },
       ]}>
-      <Svg width={size} height={size}>
+      <Svg width={canvas} height={canvas}>
         {/* Outer glow */}
         <Circle cx={cx} cy={cy} r={r + 10} stroke={color} strokeWidth={22} opacity={0.06} fill="none" />
         <Circle cx={cx} cy={cy} r={r + 4} stroke={color} strokeWidth={14} opacity={0.1} fill="none" />
@@ -133,10 +176,11 @@ function recordEvent(type: NightObservationEvent['type'], events: NightObservati
 function applyNightObservationChrome() {
   void SystemUI.setBackgroundColorAsync(ASLEEP_BG);
   if (Platform.OS !== 'android') return;
-  RNStatusBar.setTranslucent(true);
-  RNStatusBar.setBackgroundColor('transparent');
-  RNStatusBar.setBarStyle('dark-content', true);
-  NavigationBar.setHidden(true);
+  RNStatusBar.setTranslucent(false);
+  RNStatusBar.setBackgroundColor(ASLEEP_BG);
+  RNStatusBar.setBarStyle('light-content', true);
+  NavigationBar.setHidden(false);
+  NavigationBar.setStyle('light');
 }
 
 export function SleepNightObservationOverlay({ labels, onClose, onFinish }: Props) {
@@ -144,9 +188,10 @@ export function SleepNightObservationOverlay({ labels, onClose, onFinish }: Prop
   const restoreAppChrome = useAppSystemChromeRestore();
   const eventsRef = useRef<NightObservationEvent[]>([]);
   const screen = Dimensions.get('screen');
+  const clockLabel = useNightClockLabel();
   const [activeZone, setActiveZone] = useState<ActiveZone>(null);
   const [pressedZone, setPressedZone] = useState<ActiveZone>(null);
-  const glowSize = screen.width * 0.8;
+  const glowSize = Math.min(screen.width * 0.62, screen.height * 0.28) * 1.30;
 
   const activateChrome = useCallback(() => {
     applyNightObservationChrome();
@@ -197,56 +242,54 @@ export function SleepNightObservationOverlay({ labels, onClose, onFinish }: Prop
 
   const asleepGlow = pressedZone === 'asleep' || activeZone === 'asleep';
   const awakeGlow = pressedZone === 'awake' || activeZone === 'awake';
+  const bottomInset = Math.max(insets.bottom, 12);
+  const windowSize = Dimensions.get('window');
 
   return (
-    <View
-      style={[
-        styles.overlay,
-        {
-          width: screen.width,
-          height: screen.height,
-          top: -insets.top,
-        },
-      ]}>
-      <ExpoStatusBar style="dark" />
+    <View style={[styles.overlay, { width: windowSize.width, height: windowSize.height }]}>
+      <ExpoStatusBar style="light" />
       {Platform.OS === 'android' ? (
-        <RNStatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
+        <RNStatusBar backgroundColor={ASLEEP_BG} barStyle="light-content" />
       ) : null}
-      {Platform.OS === 'android' ? <NavigationBar hidden style="dark" /> : null}
+      {Platform.OS === 'android' ? <NavigationBar hidden={false} style="light" /> : null}
       <View style={styles.root}>
-        <Pressable
-          style={[styles.half, styles.asleepHalf]}
-          onPress={handleAsleepPress}
-          onPressIn={() => setPressedZone('asleep')}
-          onPressOut={() => setPressedZone(null)}>
-          <View style={[styles.halfInner, { paddingTop: insets.top }]}>
-            <View style={styles.labelStage}>
-              <PressGlowRing size={glowSize} color={ASLEEP_TEXT} visible={asleepGlow} />
-              <View style={styles.labelRow}>
-                <CrescentMoonIcon size={66} color={ASLEEP_TEXT} />
-                <Text style={styles.asleepText}>{labels.sleepNightObservationAsleep}</Text>
+        <View style={styles.zones}>
+          <Pressable
+            style={[styles.half, styles.asleepHalf]}
+            onPress={handleAsleepPress}
+            onPressIn={() => setPressedZone('asleep')}
+            onPressOut={() => setPressedZone(null)}>
+            <View style={[styles.halfInner, { paddingTop: insets.top }]}>
+              <View style={[styles.labelStage, { width: glowSize + GLOW_PAD * 2, height: glowSize + GLOW_PAD * 2 }]}>
+                <PressGlowRing size={glowSize} color={ASLEEP_TEXT} visible={asleepGlow} />
+                <View style={styles.labelRow}>
+                  <CrescentMoonIcon size={66} color={ASLEEP_TEXT} />
+                  <Text style={styles.asleepText}>{labels.sleepNightObservationAsleep}</Text>
+                </View>
               </View>
             </View>
-          </View>
-        </Pressable>
+          </Pressable>
 
-        <Pressable
-          style={[styles.half, styles.awakeHalf]}
-          onPress={handleAwakePress}
-          onPressIn={() => setPressedZone('awake')}
-          onPressOut={() => setPressedZone(null)}>
-          <View style={styles.halfInner}>
-            <View style={styles.labelStage}>
-              <PressGlowRing size={glowSize} color={AWAKE_TEXT} visible={awakeGlow} />
-              <View style={styles.labelRow}>
-                <CrescentMoonIcon size={66} color={AWAKE_TEXT} />
-                <Text style={styles.awakeText}>{labels.sleepNightObservationAwake}</Text>
+          <Pressable
+            style={[styles.half, styles.awakeHalf]}
+            onPress={handleAwakePress}
+            onPressIn={() => setPressedZone('awake')}
+            onPressOut={() => setPressedZone(null)}>
+            <View style={styles.halfInner}>
+              <View style={[styles.labelStage, { width: glowSize + GLOW_PAD * 2, height: glowSize + GLOW_PAD * 2 }]}>
+                <PressGlowRing size={glowSize} color={AWAKE_TEXT} visible={awakeGlow} />
+                <View style={styles.labelRow}>
+                  <CrescentMoonIcon size={66} color={AWAKE_TEXT} />
+                  <Text style={styles.awakeText}>{labels.sleepNightObservationAwake}</Text>
+                </View>
               </View>
             </View>
-          </View>
-        </Pressable>
+          </Pressable>
 
-        <View style={[styles.finishBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+          <NightClockStrip label={clockLabel} width={windowSize.width} />
+        </View>
+
+        <View style={[styles.finishBar, { paddingBottom: bottomInset }]}>
           <Pressable style={styles.finishButton} onPress={handleFinish} hitSlop={12}>
             <SunriseIcon size={20} color={FINISH_ACCENT} />
             <Text style={styles.finishText}>{labels.sleepNightObservationFinish}</Text>
@@ -262,27 +305,55 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     left: 0,
+    right: 0,
+    bottom: 0,
     zIndex: 1000,
     elevation: 1000,
   },
   root: {
     flex: 1,
-    backgroundColor: AWAKE_BG,
+    backgroundColor: ASLEEP_BG,
+  },
+  zones: {
+    flex: 1,
+  },
+  clockOverlay: {
+    ...StyleSheet.absoluteFill,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    zIndex: 2,
+  },
+  clockSlot: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  clockGlyph: {
+    color: CLOCK_TEXT,
+    fontFamily: Fonts.sansExtraBold,
+    fontVariant: ['tabular-nums'],
+    includeFontPadding: false,
+    textAlign: 'center',
   },
   half: {
     flex: 1,
+    overflow: 'visible',
   },
   halfInner: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'visible',
   },
   labelStage: {
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'visible',
   },
   glowWrap: {
     position: 'absolute',
+    overflow: 'visible',
   },
   labelRow: {
     flexDirection: 'row',

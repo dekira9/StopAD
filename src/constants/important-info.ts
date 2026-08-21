@@ -1,7 +1,9 @@
 import type { Language } from '@/constants/i18n';
 import { getMedicalDisclaimerText, isLegalSectionTitle } from '@/constants/legal-info';
 
-const IMPORTANT_INFO_RU = `Тревожное расстройство — это состояние, которое поддерживается сразу несколькими взаимосвязанными факторами. Изменения даже в одном из них постепенно помогают ослабить тревогу.
+const IMPORTANT_INFO_RU = `Понимание тревожности
+
+Тревожное расстройство — это состояние, которое поддерживается сразу несколькими взаимосвязанными факторами. Изменения даже в одном из них постепенно помогают ослабить тревогу.
 
 🧠 Особенности работы нервной системы
 Нервная система человека с тревожным расстройством становится более чувствительной к сигналам опасности. Она может запускать реакцию тревоги даже тогда, когда реальной угрозы нет.
@@ -54,7 +56,9 @@ const IMPORTANT_INFO_RU = `Тревожное расстройство — эт�
 Вы плохо спали → нервная система стала более чувствительной → утром почувствовали учащенное сердцебиение → возникла мысль «со мной что-то не так» → решили отменить тренировку и остаться дома → тревога уменьшилась на несколько часов, но мозг «запомнил», что избегание помогает → в следующий раз тревога возникнет еще быстрее.
 Именно поэтому дневник включает сразу несколько разделов: сон, лекарства, физическую активность, триггеры, события дня и уровень тревоги. Вместе они помогают увидеть не отдельные симптомы, а всю цепочку событий. Это делает состояние более понятным, а лечение — более осознанным и эффективным. Надо понять, что тревога — это не случайный хаос, а процесс, который можно постепенно научиться распознавать и менять.`;
 
-const IMPORTANT_INFO_EN = `Anxiety disorder is maintained by several interconnected factors. Changing even one of them gradually helps reduce anxiety.
+const IMPORTANT_INFO_EN = `Understanding anxiety
+
+Anxiety disorder is maintained by several interconnected factors. Changing even one of them gradually helps reduce anxiety.
 
 🧠 How the nervous system works
 In anxiety disorder, the nervous system becomes more sensitive to danger signals. It may trigger anxiety even when there is no real threat.
@@ -107,7 +111,9 @@ For example:
 You slept poorly → your nervous system became more sensitive → you noticed a racing heart in the morning → the thought appeared that "something is wrong with me" → you canceled exercise and stayed home → anxiety decreased for a few hours, but the brain "learned" that avoidance helps → next time anxiety appears even faster.
 That is why the diary includes sleep, medication, physical activity, triggers, daily events, and anxiety level. Together they help you see not isolated symptoms but the whole chain of events. This makes your state easier to understand and treatment more conscious and effective. Anxiety is not random chaos — it is a process you can gradually learn to recognize and change.`;
 
-const IMPORTANT_INFO_ES = `El trastorno de ansiedad se mantiene por varios factores interconectados. Cambiar incluso uno de ellos ayuda gradualmente a reducir la ansiedad.
+const IMPORTANT_INFO_ES = `Comprender la ansiedad
+
+El trastorno de ansiedad se mantiene por varios factores interconectados. Cambiar incluso uno de ellos ayuda gradualmente a reducir la ansiedad.
 
 🧠 Cómo funciona el sistema nervioso
 Con el trastorno de ansiedad, el sistema nervioso se vuelve más sensible a las señales de peligro. Puede activar la ansiedad incluso cuando no hay una amenaza real.
@@ -160,7 +166,9 @@ Por ejemplo:
 Durmió mal → el sistema nervioso se volvió más sensible → por la mañana notó taquicardia → apareció el pensamiento «algo me pasa» → canceló el entrenamiento y se quedó en casa → la ansiedad disminuyó unas horas, pero el cerebro «aprendió» que evitar ayuda → la próxima vez la ansiedad aparece aún más rápido.
 Por eso el diario incluye sueño, medicación, actividad física, desencadenantes, eventos del día y nivel de ansiedad. Juntos ayudan a ver no síntomas aislados, sino toda la cadena de eventos. Esto hace el estado más comprensible y el tratamiento más consciente y eficaz. La ansiedad no es caos aleatorio — es un proceso que puede aprender a reconocer y cambiar gradualmente.`;
 
-const IMPORTANT_INFO_FR = `Le trouble anxieux est maintenu par plusieurs facteurs interconnectés. Modifier ne serait-ce qu'un seul d'entre eux aide progressivement à réduire l'anxiété.
+const IMPORTANT_INFO_FR = `Comprendre l'anxiété
+
+Le trouble anxieux est maintenu par plusieurs facteurs interconnectés. Modifier ne serait-ce qu'un seul d'entre eux aide progressivement à réduire l'anxiété.
 
 🧠 Fonctionnement du système nerveux
 Avec un trouble anxieux, le système nerveux devient plus sensible aux signaux de danger. Il peut déclencher l'anxiété même en l'absence de menace réelle.
@@ -213,7 +221,9 @@ Par exemple :
 Vous avez mal dormi → le système nerveux est devenu plus sensible → le matin, vous avez remarqué une accélération du cœur → la pensée « quelque chose ne va pas » est apparue → vous avez annulé l'entraînement et resté à la maison → l'anxiété a diminué pendant quelques heures, mais le cerveau a « appris » que l'évitement aide → la prochaine fois, l'anxiété apparaît encore plus vite.
 C'est pourquoi le journal comprend le sommeil, les médicaments, l'activité physique, les déclencheurs, les événements de la journée et le niveau d'anxiété. Ensemble, ils aident à voir non pas des symptômes isolés, mais toute la chaîne d'événements. Cela rend l'état plus compréhensible et le traitement plus conscient et efficace. L'anxiété n'est pas un chaos aléatoire — c'est un processus que l'on peut apprendre à reconnaître et à modifier progressivement.`;
 
-const IMPORTANT_INFO_DE = `Eine Angststörung wird durch mehrere miteinander verbundene Faktoren aufrechterhalten. Schon eine Veränderung an einem davon hilft, Angst allmählich zu verringern.
+const IMPORTANT_INFO_DE = `Angst verstehen
+
+Eine Angststörung wird durch mehrere miteinander verbundene Faktoren aufrechterhalten. Schon eine Veränderung an einem davon hilft, Angst allmählich zu verringern.
 
 🧠 Wie das Nervensystem arbeitet
 Bei einer Angststörung reagiert das Nervensystem empfindlicher auf Gefahrensignale. Es kann Angst auslösen, auch wenn keine reale Bedrohung besteht.
@@ -266,7 +276,9 @@ Zum Beispiel:
 Schlecht geschlafen → das Nervensystem wurde empfindlicher → morgens Herzrasen gespürt → der Gedanke „mit mir stimmt etwas nicht“ → Training abgesagt und zu Hause geblieben → Angst sank einige Stunden, aber das Gehirn „lernte“, dass Vermeidung hilft → beim nächsten Mal tritt Angst noch schneller auf.
 Deshalb umfasst das Tagebuch Schlaf, Medikamente, körperliche Aktivität, Auslöser, Tagesereignisse und Angstniveau. Zusammen helfen sie, nicht einzelne Symptome, sondern die ganze Ereigniskette zu sehen. Das macht den Zustand verständlicher und die Behandlung bewusster und wirksamer. Angst ist kein zufälliges Chaos — es ist ein Prozess, den man nach und nach erkennen und verändern lernen kann.`;
 
-const IMPORTANT_INFO_ZH = `焦虑障碍由多个相互关联的因素维持。即使改变其中一个，也能逐渐减轻焦虑。
+const IMPORTANT_INFO_ZH = `理解焦虑
+
+焦虑障碍由多个相互关联的因素维持。即使改变其中一个，也能逐渐减轻焦虑。
 
 🧠 神经系统的特点
 在焦虑障碍中，神经系统对危险信号变得更加敏感。即使没有真正的威胁，也可能触发焦虑反应。
@@ -319,7 +331,9 @@ const IMPORTANT_INFO_ZH = `焦虑障碍由多个相互关联的因素维持。�
 睡得不好 → 神经系统更敏感 → 早晨感到心跳加快 → 出现「我出问题了」的想法 → 取消锻炼待在家里 → 焦虑减轻几小时，但大脑「记住」回避有效 → 下次焦虑出现得更快。
 因此，日记包含睡眠、药物、身体活动、触发因素、当日事件和焦虑水平。它们一起帮助看到的不是孤立症状，而是完整的事件链。这使状态更易理解，治疗更有意识和更有效。焦虑不是随机混乱——而是一个可以逐渐学会识别和改变的过程。`;
 
-const IMPORTANT_INFO_PT = `O transtorno de ansiedade é mantido por vários fatores interligados. Mudar mesmo um deles ajuda gradualmente a reduzir a ansiedade.
+const IMPORTANT_INFO_PT = `Compreender a ansiedade
+
+O transtorno de ansiedade é mantido por vários fatores interligados. Mudar mesmo um deles ajuda gradualmente a reduzir a ansiedade.
 
 🧠 Como funciona o sistema nervoso
 No transtorno de ansiedade, o sistema nervoso fica mais sensível a sinais de perigo. Pode desencadear ansiedade mesmo quando não há ameaça real.
@@ -372,7 +386,9 @@ Por exemplo:
 Dormiu mal → o sistema nervoso ficou mais sensível → de manhã sentiu taquicardia → surgiu o pensamento «algo está errado comigo» → cancelou o treino e ficou em casa → a ansiedade diminuiu por algumas horas, mas o cérebro «aprendeu» que evitar ajuda → da próxima vez a ansiedade aparece ainda mais rápido.
 Por isso o diário inclui sono, medicação, atividade física, gatilhos, eventos do dia e nível de ansiedade. Juntos ajudam a ver não sintomas isolados, mas toda a cadeia de eventos. Isso torna o estado mais compreensível e o tratamento mais consciente e eficaz. A ansiedade não é caos aleatório — é um processo que você pode aprender a reconhecer e mudar gradualmente.`;
 
-const IMPORTANT_INFO_IT = `Il disturbo d'ansia è mantenuto da diversi fattori interconnessi. Modificarne anche uno solo aiuta gradualmente a ridurre l'ansia.
+const IMPORTANT_INFO_IT = `Comprendere l'ansia
+
+Il disturbo d'ansia è mantenuto da diversi fattori interconnessi. Modificarne anche uno solo aiuta gradualmente a ridurre l'ansia.
 
 🧠 Come funziona il sistema nervoso
 Con il disturbo d'ansia, il sistema nervoso diventa più sensibile ai segnali di pericolo. Può scatenare ansia anche quando non c'è una minaccia reale.
@@ -425,7 +441,9 @@ Per esempio:
 Hai dormito male → il sistema nervoso è diventato più sensibile → al mattino hai sentito il battito accelerato → è comparso il pensiero «c'è qualcosa che non va» → hai annullato l'allenamento e sei rimasto a casa → l'ansia è diminuita per qualche ora, ma il cervello ha «imparato» che evitare aiuta → la prossima volta l'ansia compare ancora più in fretta.
 Per questo il diario include sonno, farmaci, attività fisica, trigger, eventi della giornata e livello d'ansia. Insieme aiutano a vedere non sintomi isolati, ma l'intera catena di eventi. Questo rende lo stato più comprensibile e il trattamento più consapevole ed efficace. L'ansia non è caos casuale — è un processo che puoi imparare a riconoscere e cambiare gradualmente.`;
 
-const IMPORTANT_INFO_JA = `不安障害は、複数の相互に関連する要因によって維持されています。そのうちの一つでも変えていくことで、不安は徐々に軽減していきます。
+const IMPORTANT_INFO_JA = `不安を理解する
+
+不安障害は、複数の相互に関連する要因によって維持されています。そのうちの一つでも変えていくことで、不安は徐々に軽減していきます。
 
 🧠 神経系の働き
 不安障害があると、神経系は危険信号により敏感になります。本当の脅威がない場合でも、不安反応が起こることがあります。
@@ -478,7 +496,9 @@ const IMPORTANT_INFO_JA = `不安障害は、複数の相互に関連する要�
 睡眠不足 → 神経系がより敏感に → 朝、動悸に気づく → 「何かおかしい」という考えが浮かぶ → 運動をキャンセルして家にいる → 数時間不安が減るが、脳は回避が効くと「学習」する → 次回はさらに早く不安が現れる。
 そのため、日記には睡眠、服薬、身体活動、トリガー、その日の出来事、不安レベルが含まれます。これらを合わせることで、孤立した症状ではなく出来事の連鎖全体を見られるようになります。状態がより理解しやすくなり、治療がより意識的で効果的になります。不安はランダムな混乱ではなく、徐々に認識し、変えていくことができるプロセスです。`;
 
-const IMPORTANT_INFO_KO = `불안 장애는 여러 상호 연결된 요인에 의해 유지됩니다. 그중 하나만 바꿔도 점차 불안을 줄이는 데 도움이 됩니다.
+const IMPORTANT_INFO_KO = `불안 이해하기
+
+불안 장애는 여러 상호 연결된 요인에 의해 유지됩니다. 그중 하나만 바꿔도 점차 불안을 줄이는 데 도움이 됩니다.
 
 🧠 신경계의 작동
 불안 장애가 있으면 신경계가 위험 신호에 더 민감해집니다. 실제 위협이 없어도 불안 반응이 일어날 수 있습니다.
@@ -545,6 +565,16 @@ const IMPORTANT_INFO_BY_LANGUAGE: Record<Language, string> = {
 };
 
 const IMPORTANT_INFO_SUMMARY_TITLES = new Set([
+  'Понимание тревожности',
+  'Understanding anxiety',
+  'Comprender la ansiedad',
+  "Comprendre l'anxiété",
+  'Angst verstehen',
+  '理解焦虑',
+  'Compreender a ansiedade',
+  "Comprendere l'ansia",
+  '不安を理解する',
+  '불안 이해하기',
   'И самое главное',
   'Most importantly',
   'Lo más importante',
@@ -568,4 +598,76 @@ export function isImportantInfoSectionTitle(paragraph: string): boolean {
     /^[🧠💭🚶❤️]/.test(trimmed) ||
     IMPORTANT_INFO_SUMMARY_TITLES.has(trimmed)
   );
+}
+
+const EXAMPLES_LABEL_RE =
+  /^(Примеры|Examples|Ejemplos|Exemples|Beispiele|Exemplos|Esempi|例如|例|예)\s*[:：]\s*$/;
+
+export type ImportantInfoSectionParts = {
+  title: string;
+  intro: string;
+  examplesLabel: string | null;
+  examples: string[];
+  outro: string;
+};
+
+function isExamplesListItem(line: string, previousItem: string | null): boolean {
+  const trimmed = line.trim();
+  if (!trimmed) return false;
+  if (/[;；]$/.test(trimmed)) return true;
+  // Quoted thought examples: «…», "…", 「…」, “…”
+  if (/^[«"“「『]/.test(trimmed)) return true;
+  if (previousItem && /[;；]$/.test(previousItem) && /[.。]$/.test(trimmed)) return true;
+  return false;
+}
+
+function cleanExampleItem(line: string): string {
+  return line.trim().replace(/[;；]\s*$/, '');
+}
+
+/** Split an emoji section block into title, prose, and a bullet examples list. */
+export function parseImportantInfoEmojiSection(paragraph: string): ImportantInfoSectionParts | null {
+  const match = paragraph.match(/^([🧠💭🚶❤️].+)\n([\s\S]+)$/);
+  if (!match) return null;
+
+  const title = match[1].trim();
+  const lines = match[2].split('\n');
+  const labelIndex = lines.findIndex((line) => EXAMPLES_LABEL_RE.test(line.trim()));
+
+  if (labelIndex < 0) {
+    return {
+      title,
+      intro: match[2].trim(),
+      examplesLabel: null,
+      examples: [],
+      outro: '',
+    };
+  }
+
+  const intro = lines.slice(0, labelIndex).join('\n').trim();
+  const examplesLabel = lines[labelIndex].trim();
+  const examples: string[] = [];
+  let cursor = labelIndex + 1;
+
+  while (cursor < lines.length) {
+    const line = lines[cursor].trim();
+    if (!line) {
+      cursor += 1;
+      continue;
+    }
+    const previous = examples.length > 0 ? examples[examples.length - 1] : null;
+    if (!isExamplesListItem(line, previous)) break;
+    examples.push(line);
+    cursor += 1;
+  }
+
+  const outro = lines.slice(cursor).join('\n').trim();
+
+  return {
+    title,
+    intro,
+    examplesLabel,
+    examples: examples.map(cleanExampleItem),
+    outro,
+  };
 }

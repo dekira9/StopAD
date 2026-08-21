@@ -258,7 +258,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     borderWidth: 1.5,
-    borderRadius: 12,
+    borderRadius: 999,
     paddingVertical: 8,
     paddingHorizontal: 10,
   },

@@ -333,11 +333,11 @@ export function SleepInput({ label, value, labels, theme, onChange, onOpenNightO
             onPress={() => onOpenNightObservation?.()}
             style={({ pressed }) => [
               styles.nightObservationButton,
-              { borderColor: NIGHT.buttonBorder, backgroundColor: NIGHT.accentSoft },
+              { borderColor: NIGHT.buttonBorder },
               pressed && styles.pressed,
             ]}>
-            <Ionicons name="moon" size={16} color={NIGHT.accent} />
-            <Text style={[styles.nightObservationButtonText, { color: NIGHT.accent }]}>
+            <Ionicons name="moon" size={24} color="#C4A070" />
+            <Text style={[styles.nightObservationButtonText, { color: '#6F63C4' }]}>
               {labels.sleepNightObservationButton}
             </Text>
           </Pressable>
@@ -488,8 +488,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     borderWidth: 1.5,
-    borderRadius: 12,
-    backgroundColor: '#FFFFFF',
+    borderRadius: 999,
+    backgroundColor: 'rgba(247, 244, 252, 0.55)',
     paddingVertical: 8,
     paddingHorizontal: 10,
     marginTop: 2,
@@ -531,8 +531,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    borderWidth: 1,
-    borderRadius: 14,
+    borderWidth: 2,
+    borderRadius: 999,
+    backgroundColor: '#F7F4FC',
     paddingVertical: 12,
     paddingHorizontal: 12,
     shadowColor: '#5A4F7A',

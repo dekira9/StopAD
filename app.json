@@ -44,7 +44,12 @@
         "expo-notifications",
         {
           "color": "#141414",
-          "icon": "./assets/images/icon.png"
+          "icon": "./assets/images/icon.png",
+          "sounds": [
+            "./assets/Sounds/reminder_quiet.wav",
+            "./assets/Sounds/reminder_normal.wav",
+            "./assets/Sounds/reminder_noticeable.wav"
+          ]
         }
       ],
       [
@@ -58,7 +63,8 @@
       "expo-image",
       "@react-native-community/datetimepicker",
       "expo-sharing",
-      "expo-audio"
+      "expo-audio",
+      "./plugins/with-reminder-notification-channels"
     ],
     "experiments": {
       "typedRoutes": true,
