@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { MenuPersonIcon } from '@/components/footer-bar-icons';
 import { LegalDocModal } from '@/components/legal-doc-modal';
 import { LANGUAGES, type AppLabels, type Language } from '@/constants/i18n';
 import {
@@ -11,7 +12,14 @@ import {
   getSupportInfoText,
 } from '@/constants/legal-info';
 import { REMINDER_SOUND_IDS, type ReminderSoundId } from '@/constants/reminder-sounds';
-import { weekBodyTextStyle, weekButtonTextStyle, weekCardTitleStyle } from '@/constants/typography';
+import { getDayWeekBackground } from '@/constants/theme';
+import {
+  dayHeaderTitleStyle,
+  formatSectionTitle,
+  weekBodyTextStyle,
+  weekButtonTextStyle,
+  weekCardTitleStyle,
+} from '@/constants/typography';
 import { useAppChromeTheme } from '@/hooks/use-app-chrome-theme';
 import { playReminderSoundPreview } from '@/utils/reminder-sound';
 
@@ -31,6 +39,34 @@ type Props = {
 };
 
 type LegalDocKey = 'disclaimer' | 'privacy' | 'support' | null;
+type SettingsSubModalKey = 'language' | 'reviewMode' | 'reminder' | null;
+
+const MENU_LINK_ICON_COLOR = '#D08A6A';
+const MENU_HEADER_PERSON_FILL = '#8A9BD2';
+
+function MenuSectionHeader({
+  title,
+  weekdayNameColor,
+  dayBorderColor,
+  headerBg,
+}: {
+  title: string;
+  weekdayNameColor: string;
+  dayBorderColor: string;
+  headerBg: string;
+}) {
+  return (
+    <View style={styles.menuSection}>
+      <View style={[styles.menuSectionDivider, { backgroundColor: dayBorderColor }]} />
+      <View style={[styles.menuSectionHeader, { backgroundColor: headerBg }]}>
+        <Text style={[styles.menuSectionHeaderText, { color: weekdayNameColor }]}>
+          {formatSectionTitle(title)}
+        </Text>
+      </View>
+      <View style={[styles.menuSectionDivider, { backgroundColor: dayBorderColor }]} />
+    </View>
+  );
+}
 
 export function SettingsModal({
   visible,
@@ -47,8 +83,10 @@ export function SettingsModal({
   onClose,
 }: Props) {
   const insets = useSafeAreaInsets();
-  const { modal: theme } = useAppChromeTheme();
+  const { modal: theme, theme: colorTheme, isDark, chrome } = useAppChromeTheme();
+  const sectionHeaderBg = getDayWeekBackground(isDark, 0);
   const [legalDoc, setLegalDoc] = useState<LegalDocKey>(null);
+  const [settingsSubModal, setSettingsSubModal] = useState<SettingsSubModalKey>(null);
 
   const legalBody =
     legalDoc === 'disclaimer'
@@ -68,6 +106,15 @@ export function SettingsModal({
           ? labels.supportTitle
           : '';
 
+  const settingsSubModalTitle =
+    settingsSubModal === 'language'
+      ? labels.selectLanguage
+      : settingsSubModal === 'reviewMode'
+        ? labels.reviewMode
+        : settingsSubModal === 'reminder'
+          ? labels.reminder
+          : '';
+
   return (
     <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
       <View style={[styles.overlay, { backgroundColor: theme.modalOverlay }]}>
@@ -82,7 +129,9 @@ export function SettingsModal({
           ]}>
           <View style={styles.headerRow}>
             <View style={styles.headerBtn} />
-            <Text style={[styles.title, { color: theme.text }]}>{labels.menuButton}</Text>
+            <View accessible accessibilityRole="header" accessibilityLabel={labels.menuButton} style={styles.headerTitleIcon}>
+              <MenuPersonIcon size={36} fillColor={MENU_HEADER_PERSON_FILL} strokeColor={theme.text} />
+            </View>
             <Pressable
               onPress={onClose}
               hitSlop={8}
@@ -98,7 +147,12 @@ export function SettingsModal({
               <Text style={[styles.brandTagline, { color: theme.textSecondary }]}>{labels.appTagline}</Text>
             </View>
 
-            <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>{labels.menuHelpSection}</Text>
+            <MenuSectionHeader
+              title={labels.menuHelpSection}
+              weekdayNameColor={colorTheme.weekdayName}
+              dayBorderColor={chrome.dayBorder}
+              headerBg={sectionHeaderBg}
+            />
 
             <Pressable
               onPress={onOpenUnderstandingAnxiety}
@@ -108,7 +162,7 @@ export function SettingsModal({
                 { backgroundColor: theme.circleBg, borderColor: theme.circleBorder },
                 pressed && styles.pressed,
               ]}>
-              <Ionicons name="heart-outline" size={16} color={theme.icon} />
+              <Ionicons name="heart-outline" size={16} color={MENU_LINK_ICON_COLOR} />
               <Text style={[styles.linkRowText, { color: theme.text }]}>{labels.understandingAnxietyTitle}</Text>
               <Ionicons name="chevron-forward" size={16} color={theme.iconMuted} />
             </Pressable>
@@ -121,137 +175,74 @@ export function SettingsModal({
                 { backgroundColor: theme.circleBg, borderColor: theme.circleBorder },
                 pressed && styles.pressed,
               ]}>
-              <Ionicons name="school-outline" size={16} color={theme.icon} />
+              <Ionicons name="school-outline" size={16} color={MENU_LINK_ICON_COLOR} />
               <Text style={[styles.linkRowText, { color: theme.text }]}>{labels.showOnboardingAgain}</Text>
               <Ionicons name="chevron-forward" size={16} color={theme.iconMuted} />
             </Pressable>
 
-            <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>{labels.selectLanguage}</Text>
-            <View style={styles.langList}>
-              {(Object.keys(LANGUAGES) as Language[]).map((lang) => {
-                const active = language === lang;
-                return (
-                  <Pressable
-                    key={lang}
-                    onPress={() => onLanguageChange(lang)}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: active }}
-                    style={({ pressed }) => [
-                      styles.langRow,
-                      active
-                        ? { backgroundColor: theme.activeBg, borderColor: theme.activeBg }
-                        : { backgroundColor: theme.inactiveBg, borderColor: theme.inactiveBorder },
-                      pressed && styles.pressed,
-                    ]}>
-                    <Text style={[styles.langRowText, { color: active ? theme.activeText : theme.inactiveText }]}>
-                      {LANGUAGES[lang].name}
-                    </Text>
-                    {active ? <Ionicons name="checkmark" size={16} color={theme.activeText} /> : <View style={styles.langCheckSpacer} />}
-                  </Pressable>
-                );
-              })}
-            </View>
+            <MenuSectionHeader
+              title={labels.settingsTitle}
+              weekdayNameColor={colorTheme.weekdayName}
+              dayBorderColor={chrome.dayBorder}
+              headerBg={sectionHeaderBg}
+            />
 
-            <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>{labels.settingsTitle}</Text>
+            <Pressable
+              onPress={() => setSettingsSubModal('language')}
+              accessibilityLabel={labels.selectLanguage}
+              style={({ pressed }) => [
+                styles.linkRow,
+                { backgroundColor: theme.circleBg, borderColor: theme.circleBorder },
+                pressed && styles.pressed,
+              ]}>
+              <Ionicons name="globe-outline" size={16} color={MENU_LINK_ICON_COLOR} />
+              <Text style={[styles.linkRowText, { color: theme.text }]}>{labels.selectLanguage}</Text>
+              <Ionicons name="chevron-forward" size={16} color={theme.iconMuted} />
+            </Pressable>
 
-            <View style={[styles.rowCard, { backgroundColor: theme.subtlePanelBg, borderColor: theme.subtlePanelBorder }]}>
-              <View style={styles.rowTextWrap}>
-                <Text style={[styles.rowTitle, { color: theme.text }]}>{labels.reviewMode}</Text>
-                <Text style={[styles.rowHint, { color: theme.textSecondary }]}>{labels.reviewModeHint}</Text>
-              </View>
-              <Switch
-                value={reviewMode}
-                onValueChange={onReviewModeChange}
-                trackColor={{ false: theme.inactiveBorder, true: theme.activeBg }}
-                thumbColor="#FFFFFF"
-                ios_backgroundColor={theme.inactiveBorder}
-              />
-            </View>
+            <Pressable
+              onPress={() => setSettingsSubModal('reviewMode')}
+              accessibilityLabel={labels.reviewMode}
+              style={({ pressed }) => [
+                styles.linkRow,
+                { backgroundColor: theme.circleBg, borderColor: theme.circleBorder },
+                pressed && styles.pressed,
+              ]}>
+              <Ionicons name="eye-outline" size={16} color={MENU_LINK_ICON_COLOR} />
+              <Text style={[styles.linkRowText, { color: theme.text }]}>{labels.reviewMode}</Text>
+              <Ionicons name="chevron-forward" size={16} color={theme.iconMuted} />
+            </Pressable>
 
-            <View style={[styles.reminderCard, { backgroundColor: theme.subtlePanelBg, borderColor: theme.subtlePanelBorder }]}>
-              <View style={styles.reminderTopRow}>
-                <View style={styles.rowTextWrap}>
-                  <Text style={[styles.rowTitle, { color: theme.text }]}>{labels.reminder}</Text>
-                  <Text style={[styles.rowHint, { color: theme.textSecondary }]}>{labels.reminderHint}</Text>
-                </View>
-                <Pressable
-                  onPress={onEnableReminders}
-                  accessibilityLabel={labels.configureNotifications}
-                  style={({ pressed }) => [
-                    styles.iconAction,
-                    { backgroundColor: theme.activeBg },
-                    pressed && styles.pressed,
-                  ]}>
-                  <Ionicons name="notifications-outline" size={16} color={theme.activeText} />
-                </Pressable>
-              </View>
+            <Pressable
+              onPress={() => setSettingsSubModal('reminder')}
+              accessibilityLabel={labels.reminder}
+              style={({ pressed }) => [
+                styles.linkRow,
+                { backgroundColor: theme.circleBg, borderColor: theme.circleBorder },
+                pressed && styles.pressed,
+              ]}>
+              <Ionicons name="notifications-outline" size={16} color={MENU_LINK_ICON_COLOR} />
+              <Text style={[styles.linkRowText, { color: theme.text }]}>{labels.reminder}</Text>
+              <Ionicons name="chevron-forward" size={16} color={theme.iconMuted} />
+            </Pressable>
 
-              <View style={styles.soundBlock}>
-                <Text style={[styles.rowTitle, { color: theme.text }]}>{labels.reminderSound}</Text>
-                <Text style={[styles.rowHint, { color: theme.textSecondary }]}>{labels.reminderSoundHint}</Text>
-                <View style={styles.soundChips}>
-                  {REMINDER_SOUND_IDS.map((soundId) => {
-                    const active = reminderSound === soundId;
-                    const soundLabel =
-                      soundId === 'quiet'
-                        ? labels.reminderSoundQuiet
-                        : soundId === 'normal'
-                          ? labels.reminderSoundNormal
-                          : labels.reminderSoundNoticeable;
-                    return (
-                      <Pressable
-                        key={soundId}
-                        onPress={() => {
-                          void playReminderSoundPreview(soundId);
-                          onReminderSoundChange(soundId);
-                        }}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected: active }}
-                        accessibilityLabel={soundLabel}
-                        style={({ pressed }) => [
-                          styles.soundChip,
-                          active
-                            ? { backgroundColor: theme.activeBg, borderColor: theme.activeBg }
-                            : { backgroundColor: theme.inactiveBg, borderColor: theme.inactiveBorder },
-                          pressed && styles.pressed,
-                        ]}>
-                        <Text
-                          style={[
-                            styles.soundChipText,
-                            { color: active ? theme.activeText : theme.inactiveText },
-                          ]}
-                          numberOfLines={1}>
-                          {soundLabel}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              </View>
-            </View>
-
-            <View style={[styles.privacyCard, { backgroundColor: theme.subtlePanelBg, borderColor: theme.subtlePanelBorder }]}>
-              <View style={styles.privacyHeader}>
-                <Ionicons name="lock-closed-outline" size={16} color={theme.icon} />
-                <Text style={[styles.rowTitle, { color: theme.text }]}>{labels.dataManagement}</Text>
-              </View>
-              <Text style={[styles.rowHint, { color: theme.textSecondary }]}>{labels.privacyHint}</Text>
-            </View>
-
-            <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>{labels.menuAboutSection}</Text>
+            <MenuSectionHeader
+              title={labels.menuAboutSection}
+              weekdayNameColor={colorTheme.weekdayName}
+              dayBorderColor={chrome.dayBorder}
+              headerBg={sectionHeaderBg}
+            />
 
             <Pressable
               onPress={() => setLegalDoc('disclaimer')}
               accessibilityLabel={labels.medicalDisclaimerTitle}
               style={({ pressed }) => [
-                styles.linkCard,
-                { backgroundColor: theme.subtlePanelBg, borderColor: theme.subtlePanelBorder },
+                styles.linkRow,
+                { backgroundColor: theme.circleBg, borderColor: theme.circleBorder },
                 pressed && styles.pressed,
               ]}>
-              <View style={styles.rowTextWrap}>
-                <Text style={[styles.rowTitle, { color: theme.text }]}>{labels.medicalDisclaimerTitle}</Text>
-                <Text style={[styles.rowHint, { color: theme.textSecondary }]}>{labels.medicalDisclaimerShort}</Text>
-              </View>
+              <Ionicons name="medical-outline" size={16} color={MENU_LINK_ICON_COLOR} />
+              <Text style={[styles.linkRowText, { color: theme.text }]}>{labels.medicalDisclaimerTitle}</Text>
               <Ionicons name="chevron-forward" size={16} color={theme.iconMuted} />
             </Pressable>
 
@@ -263,7 +254,7 @@ export function SettingsModal({
                 { backgroundColor: theme.circleBg, borderColor: theme.circleBorder },
                 pressed && styles.pressed,
               ]}>
-              <Ionicons name="document-text-outline" size={16} color={theme.icon} />
+              <Ionicons name="document-text-outline" size={16} color={MENU_LINK_ICON_COLOR} />
               <Text style={[styles.linkRowText, { color: theme.text }]}>{labels.privacyPolicyTitle}</Text>
               <Ionicons name="chevron-forward" size={16} color={theme.iconMuted} />
             </Pressable>
@@ -276,10 +267,18 @@ export function SettingsModal({
                 { backgroundColor: theme.circleBg, borderColor: theme.circleBorder },
                 pressed && styles.pressed,
               ]}>
-              <Ionicons name="mail-outline" size={16} color={theme.icon} />
+              <Ionicons name="mail-outline" size={16} color={MENU_LINK_ICON_COLOR} />
               <Text style={[styles.linkRowText, { color: theme.text }]}>{labels.supportTitle}</Text>
               <Ionicons name="chevron-forward" size={16} color={theme.iconMuted} />
             </Pressable>
+
+            <View style={[styles.privacyCard, { backgroundColor: theme.subtlePanelBg, borderColor: theme.subtlePanelBorder }]}>
+              <View style={styles.privacyHeader}>
+                <Ionicons name="lock-closed-outline" size={16} color={MENU_LINK_ICON_COLOR} />
+                <Text style={[styles.rowTitle, { color: theme.text }]}>{labels.dataManagement}</Text>
+              </View>
+              <Text style={[styles.rowHint, { color: theme.textSecondary }]}>{labels.privacyHint}</Text>
+            </View>
           </ScrollView>
         </View>
       </View>
@@ -291,6 +290,155 @@ export function SettingsModal({
         labels={labels}
         onClose={() => setLegalDoc(null)}
       />
+
+      <Modal
+        transparent
+        visible={settingsSubModal !== null}
+        animationType="slide"
+        onRequestClose={() => setSettingsSubModal(null)}>
+        <View style={[styles.overlay, { backgroundColor: theme.modalOverlay }]}>
+          <View
+            style={[
+              styles.card,
+              {
+                backgroundColor: theme.modalBg,
+                borderColor: theme.subtlePanelBorder,
+                paddingBottom: Math.max(insets.bottom, 16),
+              },
+            ]}>
+            <View style={styles.headerRow}>
+              <View style={styles.headerBtn} />
+              <Text style={[styles.title, { color: theme.text }]}>{settingsSubModalTitle}</Text>
+              <Pressable
+                onPress={() => setSettingsSubModal(null)}
+                hitSlop={8}
+                accessibilityLabel={labels.done}
+                style={({ pressed }) => [styles.headerBtn, pressed && styles.pressed]}>
+                <Ionicons name="close" size={20} color={theme.text} />
+              </Pressable>
+            </View>
+
+            <ScrollView
+              style={styles.scroll}
+              contentContainerStyle={styles.scrollContent}
+              keyboardShouldPersistTaps="handled">
+              {settingsSubModal === 'language' ? (
+                <View style={styles.langList}>
+                  {(Object.keys(LANGUAGES) as Language[]).map((lang) => {
+                    const active = language === lang;
+                    return (
+                      <Pressable
+                        key={lang}
+                        onPress={() => {
+                          onLanguageChange(lang);
+                          setSettingsSubModal(null);
+                        }}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: active }}
+                        style={({ pressed }) => [
+                          styles.langRow,
+                          active
+                            ? { backgroundColor: theme.activeBg, borderColor: theme.activeBg }
+                            : { backgroundColor: theme.inactiveBg, borderColor: theme.inactiveBorder },
+                          pressed && styles.pressed,
+                        ]}>
+                        <Text style={[styles.langRowText, { color: active ? theme.activeText : theme.inactiveText }]}>
+                          {LANGUAGES[lang].name}
+                        </Text>
+                        {active ? (
+                          <Ionicons name="checkmark" size={16} color={theme.activeText} />
+                        ) : (
+                          <View style={styles.langCheckSpacer} />
+                        )}
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              ) : null}
+
+              {settingsSubModal === 'reviewMode' ? (
+                <View style={[styles.rowCard, { backgroundColor: theme.subtlePanelBg, borderColor: theme.subtlePanelBorder }]}>
+                  <View style={styles.rowTextWrap}>
+                    <Text style={[styles.rowTitle, { color: theme.text }]}>{labels.reviewMode}</Text>
+                    <Text style={[styles.rowHint, { color: theme.textSecondary }]}>{labels.reviewModeHint}</Text>
+                  </View>
+                  <Switch
+                    value={reviewMode}
+                    onValueChange={onReviewModeChange}
+                    trackColor={{ false: theme.inactiveBorder, true: theme.activeBg }}
+                    thumbColor="#FFFFFF"
+                    ios_backgroundColor={theme.inactiveBorder}
+                  />
+                </View>
+              ) : null}
+
+              {settingsSubModal === 'reminder' ? (
+                <View style={[styles.reminderCard, { backgroundColor: theme.subtlePanelBg, borderColor: theme.subtlePanelBorder }]}>
+                  <View style={styles.reminderTopRow}>
+                    <View style={styles.rowTextWrap}>
+                      <Text style={[styles.rowTitle, { color: theme.text }]}>{labels.reminder}</Text>
+                      <Text style={[styles.rowHint, { color: theme.textSecondary }]}>{labels.reminderHint}</Text>
+                    </View>
+                    <Pressable
+                      onPress={onEnableReminders}
+                      accessibilityLabel={labels.configureNotifications}
+                      style={({ pressed }) => [
+                        styles.iconAction,
+                        { backgroundColor: theme.activeBg },
+                        pressed && styles.pressed,
+                      ]}>
+                      <Ionicons name="notifications-outline" size={16} color={theme.activeText} />
+                    </Pressable>
+                  </View>
+
+                  <View style={styles.soundBlock}>
+                    <Text style={[styles.rowTitle, { color: theme.text }]}>{labels.reminderSound}</Text>
+                    <Text style={[styles.rowHint, { color: theme.textSecondary }]}>{labels.reminderSoundHint}</Text>
+                    <View style={styles.soundChips}>
+                      {REMINDER_SOUND_IDS.map((soundId) => {
+                        const active = reminderSound === soundId;
+                        const soundLabel =
+                          soundId === 'quiet'
+                            ? labels.reminderSoundQuiet
+                            : soundId === 'normal'
+                              ? labels.reminderSoundNormal
+                              : labels.reminderSoundNoticeable;
+                        return (
+                          <Pressable
+                            key={soundId}
+                            onPress={() => {
+                              void playReminderSoundPreview(soundId);
+                              onReminderSoundChange(soundId);
+                            }}
+                            accessibilityRole="button"
+                            accessibilityState={{ selected: active }}
+                            accessibilityLabel={soundLabel}
+                            style={({ pressed }) => [
+                              styles.soundChip,
+                              active
+                                ? { backgroundColor: theme.activeBg, borderColor: theme.activeBg }
+                                : { backgroundColor: theme.inactiveBg, borderColor: theme.inactiveBorder },
+                              pressed && styles.pressed,
+                            ]}>
+                            <Text
+                              style={[
+                                styles.soundChipText,
+                                { color: active ? theme.activeText : theme.inactiveText },
+                              ]}
+                              numberOfLines={1}>
+                              {soundLabel}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </View>
+                </View>
+              ) : null}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </Modal>
   );
 }
@@ -321,6 +469,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  headerTitleIcon: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 36,
+  },
   title: {
     ...weekCardTitleStyle,
     fontSize: 17,
@@ -349,11 +502,22 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
   },
-  sectionLabel: {
-    ...weekBodyTextStyle,
-    fontSize: 13,
-    fontWeight: '700',
-    marginTop: 4,
+  menuSection: {
+    marginHorizontal: -16,
+  },
+  menuSectionDivider: {
+    height: StyleSheet.hairlineWidth,
+    alignSelf: 'stretch',
+  },
+  menuSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  menuSectionHeaderText: {
+    ...dayHeaderTitleStyle,
+    lineHeight: 26,
   },
   langList: { gap: 8 },
   langRow: {
@@ -429,15 +593,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-  },
-  linkCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
   },
   linkRow: {
     flexDirection: 'row',

@@ -12,13 +12,15 @@ export const Colors = {
     text: '#2C3654',
     background: '#F5F6FA',
     backgroundSelected: '#EEF0F8',
-    textSecondary: '#8B90A0',
+    textSecondary: '#727A91',
     accent: '#8A9BD2',
     accentText: '#FFFFFF',
     todayMarker: '#8A9BD2',
     cardSurface: '#FFFFFF',
     medicationCompleted: '#8A96B0',
     weekdayName: '#68788f',
+    chromeBorder: 'rgba(138,155,210,0.22)',
+    reminderOnBg: 'rgba(138,155,210,0.22)',
   },
   dark: {
     text: '#E8EAF2',
@@ -31,6 +33,8 @@ export const Colors = {
     cardSurface: '#161A26',
     medicationCompleted: '#9AA6BE',
     weekdayName: '#A8B4C4',
+    chromeBorder: 'rgba(154,168,212,0.26)',
+    reminderOnBg: 'rgba(154,168,212,0.26)',
   },
 } as const;
 

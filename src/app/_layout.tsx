@@ -12,11 +12,11 @@ import {
   RobotoCondensed_500Medium,
   useFonts as useRobotoCondensedFonts,
 } from '@expo-google-fonts/roboto-condensed';
-import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router/react-navigation';
+import { DefaultTheme, ThemeProvider } from 'expo-router/react-navigation';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
-import { Text, TextInput, useColorScheme } from 'react-native';
+import { Text, TextInput } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
@@ -33,8 +33,6 @@ const TextInputWithDefaultProps = TextInput as typeof TextInput & ComponentWithD
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
   const [nunitoLoaded] = useNunitoFonts({
     Nunito_300Light,
     Nunito_400Regular,
@@ -70,20 +68,17 @@ export default function RootLayout() {
     return null;
   }
 
-  const appBackground = isDark ? Colors.dark.background : Colors.light.background;
-
   return (
     <SafeAreaProvider>
-      <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
+      <ThemeProvider value={DefaultTheme}>
         <AnimatedSplashOverlay />
         <Stack
           screenOptions={{
             headerShown: false,
-            contentStyle: { backgroundColor: appBackground },
+            contentStyle: { backgroundColor: Colors.light.background },
           }}
         />
       </ThemeProvider>
     </SafeAreaProvider>
   );
 }
-

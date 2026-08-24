@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "hianxiety",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "backgroundColor": "#F5F6FA",
     "ios": {
       "bundleIdentifier": "com.ilyadylko.HiAnxiety",

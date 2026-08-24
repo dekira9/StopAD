@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Dimensions, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { FooterMenuDotsIcon } from '@/components/footer-bar-icons';
 import type { AppLabels } from '@/constants/i18n';
 import { useAppChromeTheme } from '@/hooks/use-app-chrome-theme';
 
@@ -91,7 +92,11 @@ export function CoachMarksOverlay({
             },
           ]}>
           <View style={styles.tooltipHeader}>
-            <Ionicons name={step === 0 ? 'pulse' : 'menu-outline'} size={18} color={theme.activeBg} />
+            {step === 0 ? (
+              <Ionicons name="pulse" size={18} color={theme.activeBg} />
+            ) : (
+              <FooterMenuDotsIcon size={18} color={theme.icon} />
+            )}
             <Text style={[styles.tooltipTitle, { color: theme.text }]}>{title}</Text>
           </View>
           <Text style={[styles.tooltipBody, { color: theme.textSecondary }]}>{body}</Text>

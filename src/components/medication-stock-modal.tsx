@@ -14,7 +14,7 @@ import {
 } from '@/constants/typography';
 import { useAppChromeTheme } from '@/hooks/use-app-chrome-theme';
 
-const RESERVE_MED_SIZE = 64;
+const RESERVE_MED_SIZE = 120;
 
 type Props = {
   visible: boolean;
@@ -69,17 +69,17 @@ function MedicationStockModalContent({
       </View>
 
       <View style={styles.headerRow}>
+        <View style={styles.headerSide} />
+        <Text style={[styles.title, { color: theme.text }]} numberOfLines={1}>
+          {formatSectionTitle(labels.medicationStockAndRefillButton)}
+        </Text>
         <Pressable
           onPress={onClose}
           hitSlop={8}
           accessibilityLabel={labels.done}
-          style={({ pressed }) => [styles.headerSide, pressed && styles.pressed]}>
-          <Ionicons name="chevron-back" size={22} color={theme.text} />
+          style={({ pressed }) => [styles.headerSide, styles.headerSideEnd, pressed && styles.pressed]}>
+          <Ionicons name="close" size={20} color={theme.text} />
         </Pressable>
-        <Text style={[styles.title, { color: theme.text }]} numberOfLines={1}>
-          {formatSectionTitle(labels.medicationStockAndRefillButton)}
-        </Text>
-        <View style={styles.headerSide} />
       </View>
 
       <View style={styles.content}>
@@ -205,6 +205,9 @@ const styles = StyleSheet.create({
     minWidth: 36,
     alignItems: 'flex-start',
     justifyContent: 'center',
+  },
+  headerSideEnd: {
+    alignItems: 'flex-end',
   },
   title: {
     ...weekCardTitleStyle,

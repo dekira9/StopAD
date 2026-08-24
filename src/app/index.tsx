@@ -25,9 +25,12 @@ import { DayDottedDivider } from '@/components/day-dotted-divider';
 import { DayNoteTile } from '@/components/day-note-tile';
 import { DaySectionCollapsible } from '@/components/day-section-collapsible';
 import { ExpandableInput } from '@/components/expandable-input';
+import { FooterMedsIcon, FooterMenuDotsIcon } from '@/components/footer-bar-icons';
 import { GrowthRingsSection } from '@/components/growth-rings-section';
+import { IcEventIcon } from '@/components/ic-event-icon';
+import { IcMoonDayIcon } from '@/components/ic-moon-day-icon';
 import { ImportantInfoModal } from '@/components/important-info-modal';
-import { BellOffIcon, BellOnIcon, MedicationsIcon, PillIcon, ScheduleIcon } from '@/components/medical-ui-icons';
+import { BellOffIcon, BellOnIcon, PillIcon, ScheduleIcon } from '@/components/medical-ui-icons';
 import { MedicationIntakeLegendModal } from '@/components/medication-intake-legend-modal';
 import { MedicationScheduleModal } from '@/components/medication-schedule-modal';
 import { MedicationStatusModal } from '@/components/medication-status-modal';
@@ -39,10 +42,8 @@ import { SettingsModal } from '@/components/settings-modal';
 import { SleepInput } from '@/components/sleep-input';
 import { SleepNightObservationOverlay } from '@/components/sleep-night-observation-modal';
 import { SportInput } from '@/components/sport-input';
-import { TriggersInput } from '@/components/triggers-input';
-import { IcEventIcon } from '@/components/ic-event-icon';
-import { IcMoonDayIcon } from '@/components/ic-moon-day-icon';
 import { SportSneakerIcon } from '@/components/sport-sneaker-icon';
+import { TriggersInput } from '@/components/triggers-input';
 import { WatDropsIcon } from '@/components/wat-drops-icon';
 import { WeeklySummaryCharts } from '@/components/weekly-summary-charts';
 import { LANGUAGES, type Language } from '@/constants/i18n';
@@ -896,7 +897,7 @@ function HomeScreen() {
             <View
               style={[
                 styles.stickyHeader,
-                { borderColor: ui.dayBorder },
+                { borderColor: ui.dayBorder, backgroundColor: ui.barBg },
               ]}>
               <View style={styles.header}>
                 <View style={styles.headerRow}>
@@ -971,7 +972,7 @@ function HomeScreen() {
                           styles.mainTabBtn,
                           active
                             ? { backgroundColor: ui.activeBg, borderColor: ui.activeBg }
-                            : { backgroundColor: ui.inactiveBg, borderColor: ui.inactiveBorder },
+                            : { backgroundColor: ui.inactiveBg, borderColor: ui.mainTabInactiveBorder },
                           pressed && styles.pressed,
                         ]}>
                         <Text
@@ -1540,7 +1541,7 @@ function HomeScreen() {
             <View
               style={[
                 styles.footerChrome,
-                { borderColor: ui.footerBorder, backgroundColor: ui.contentBg },
+                { borderColor: ui.footerBorder, backgroundColor: ui.barBg },
               ]}>
               {Platform.OS === 'android' ? (
                 <View pointerEvents="none" style={styles.footerUpShadow}>
@@ -1562,10 +1563,14 @@ function HomeScreen() {
                   accessibilityLabel={t.allMedicationsTitle}
                   style={({ pressed }) => [
                     styles.footerIconButton,
+                    styles.footerMedsButton,
                     { backgroundColor: ui.circleBg, borderColor: ui.circleBorder, shadowOpacity: ui.circleShadow },
                     pressed && styles.pressed,
                   ]}>
-                  <MedicationsIcon size={16} color={ui.icon} />
+                  <FooterMedsIcon size={36}
+                  accentColor="#adb9df"
+                  strokeColor="#000000"
+                  handFill="#FFFFFF" />
                   <Text style={[styles.footerIconLabel, styles.footerIconLabelCompact, { color: theme.text }]}>
                     {t.allMedicationsButton}
                   </Text>
@@ -1577,13 +1582,11 @@ function HomeScreen() {
                   accessibilityLabel={t.menuButton}
                   style={({ pressed }) => [
                     styles.footerIconButton,
+                    styles.footerMenuButton,
                     { backgroundColor: ui.circleBg, borderColor: ui.circleBorder, shadowOpacity: ui.circleShadow },
                     pressed && styles.pressed,
                   ]}>
-                  <Ionicons name="menu-outline" size={16} color={ui.icon} />
-                  <Text style={[styles.footerIconLabel, styles.footerIconLabelCompact, { color: theme.text }]}>
-                    {t.menuButton}
-                  </Text>
+                  <FooterMenuDotsIcon size={18} color={ui.icon} />
                 </Pressable>
                 <Pressable
                   ref={panicButtonRef}
@@ -2567,6 +2570,19 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
+  },
+  footerMedsButton: {
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    minHeight: 38,
+  },
+  footerMenuButton: {
+    width: 36,
+    height: 36,
+    minHeight: 36,
+    paddingHorizontal: 0,
+    borderRadius: 18,
   },
   footerIconButtonIconOnly: { width: 32, paddingHorizontal: 0 },
   footerIconLabel: { ...weekServiceTextStyle },

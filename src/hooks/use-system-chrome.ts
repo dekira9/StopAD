@@ -4,7 +4,6 @@ import { useCallback, useEffect } from 'react';
 import { Platform, StatusBar as RNStatusBar } from 'react-native';
 
 import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 
 // expo-navigation-bar "dark" = dark icons on a light bar; "light" = light icons on a dark bar.
 function navigationBarStyleForTheme(isDark: boolean): 'light' | 'dark' {
@@ -24,21 +23,17 @@ export function applyAppSystemChrome(background: string, isDark: boolean) {
 }
 
 export function useAppSystemChrome() {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
-  const background = isDark ? Colors.dark.background : Colors.light.background;
+  const background = Colors.light.background;
 
   useEffect(() => {
-    applyAppSystemChrome(background, isDark);
-  }, [background, isDark]);
+    applyAppSystemChrome(background, false);
+  }, [background]);
 }
 
 export function useAppSystemChromeRestore() {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
-  const background = isDark ? Colors.dark.background : Colors.light.background;
+  const background = Colors.light.background;
 
   return useCallback(() => {
-    applyAppSystemChrome(background, isDark);
-  }, [background, isDark]);
+    applyAppSystemChrome(background, false);
+  }, [background]);
 }

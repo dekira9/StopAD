@@ -10,6 +10,8 @@ export type AppChromeTheme = {
   circleBorder: string;
   circleShadow: number;
   contentBg: string;
+  /** Top / bottom chrome bars — slightly darker than main content. */
+  barBg: string;
   dayBorder: string;
   rowBorder: string;
   sectionLabelBg: string;
@@ -31,6 +33,8 @@ export type AppChromeTheme = {
   activeText: string;
   inactiveBg: string;
   inactiveBorder: string;
+  /** Darker outline for inactive top-bar tabs (Today / Week / Insights). */
+  mainTabInactiveBorder: string;
   inactiveText: string;
 };
 
@@ -56,15 +60,18 @@ export type ModalSurfaceTheme = {
 };
 
 export function buildAppChromeTheme(theme: AppColorTheme, isDark: boolean): AppChromeTheme {
+  const chromeBorder = theme.chromeBorder;
+
   return {
     icon: theme.text,
     iconMuted: isDark ? 'rgba(232,234,242,0.55)' : 'rgba(44,54,84,0.45)',
-    cardBorder: isDark ? 'rgba(154,168,212,0.20)' : 'rgba(138,155,210,0.22)',
+    cardBorder: chromeBorder,
     circleBg: isDark ? 'rgba(26,30,42,0.95)' : '#FFFFFF',
-    circleBorder: isDark ? 'rgba(154,168,212,0.30)' : 'rgba(138,155,210,0.22)',
+    circleBorder: chromeBorder,
     circleShadow: isDark ? 0 : 0.07,
     contentBg: theme.background,
-    dayBorder: isDark ? 'rgba(154,168,212,0.24)' : 'rgba(138,155,210,0.22)',
+    barBg: isDark ? theme.background : '#F5F6FA',
+    dayBorder: chromeBorder,
     rowBorder: isDark ? 'rgba(154,168,212,0.12)' : 'rgba(44,54,84,0.07)',
     sectionLabelBg: theme.backgroundSelected,
     notesBlockBg: isDark ? 'rgba(22,26,38,0.70)' : Colors.light.cardSurface,
@@ -72,18 +79,19 @@ export function buildAppChromeTheme(theme: AppColorTheme, isDark: boolean): AppC
     medicationFieldText: isDark ? '#A8B6DE' : Colors.light.todayMarker,
     accent: theme.accent,
     panelEdgeShadow: isDark ? 0.22 : 0.08,
-    footerBorder: isDark ? 'rgba(154,168,212,0.22)' : 'rgba(138,155,210,0.22)',
+    footerBorder: chromeBorder,
     modalOverlay: isDark ? 'rgba(8,10,16,0.72)' : 'rgba(44,54,84,0.32)',
     modalBg: isDark ? Colors.dark.cardSurface : Colors.light.cardSurface,
     modalMutedBg: isDark ? Colors.dark.background : Colors.light.background,
     subtlePanelBg: isDark ? 'rgba(26,30,42,0.80)' : 'rgba(238,240,248,0.75)',
-    subtlePanelBorder: isDark ? 'rgba(154,168,212,0.26)' : 'rgba(138,155,210,0.22)',
+    subtlePanelBorder: chromeBorder,
     checkOffBg: isDark ? 'rgba(26,30,42,0.95)' : '#EEF0F8',
-    checkOffBorder: isDark ? 'rgba(154,168,212,0.30)' : 'rgba(138,155,210,0.22)',
+    checkOffBorder: chromeBorder,
     activeBg: theme.accent,
     activeText: theme.accentText,
     inactiveBg: isDark ? 'rgba(26,30,42,0.95)' : '#FFFFFF',
-    inactiveBorder: isDark ? 'rgba(154,168,212,0.30)' : 'rgba(138,155,210,0.22)',
+    inactiveBorder: chromeBorder,
+    mainTabInactiveBorder: isDark ? 'rgba(154,168,212,0.48)' : 'rgba(138,155,210,0.42)',
     inactiveText: theme.text,
   };
 }

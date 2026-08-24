@@ -102,17 +102,21 @@ export function DaySectionCollapsible({
   );
 }
 
+const CARD_SHADOW = {
+  borderRadius: 16,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowRadius: 4,
+  elevation: 2,
+} as const;
+
 const styles = StyleSheet.create({
   shadowWrap: {
-    borderRadius: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 2,
-    elevation: 2,
+    ...CARD_SHADOW,
   },
   wrap: {
     borderWidth: 1,
-    borderRadius: 10,
+    borderRadius: CARD_SHADOW.borderRadius,
     overflow: 'hidden',
   },
   pillWrap: {

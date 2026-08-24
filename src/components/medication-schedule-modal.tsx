@@ -287,7 +287,13 @@ export function MedicationScheduleModal({
               <Text style={[styles.title, { color: theme.text }]}>
                 {formatSectionTitle(labels.medicationScheduleTitle)}
               </Text>
-              <View style={styles.headerSide} />
+              <Pressable
+                onPress={onClose}
+                hitSlop={8}
+                accessibilityLabel={labels.repeatCancel}
+                style={({ pressed }) => [styles.headerSide, styles.headerSideEnd, pressed && styles.pressed]}>
+                <Ionicons name="close" size={20} color={theme.text} />
+              </Pressable>
             </View>
 
             <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
@@ -587,7 +593,9 @@ export function MedicationScheduleModal({
                   pressed && styles.pressed,
                 ]}>
                 <Ionicons name="checkmark-circle" size={20} color={theme.activeText} />
-                <Text style={[styles.doneButtonText, { color: theme.activeText }]}>{labels.done}</Text>
+                <Text style={[styles.doneButtonText, { color: theme.activeText }]}>
+                  {labels.medicationScheduleSave}
+                </Text>
               </Pressable>
             </View>
 
@@ -695,6 +703,7 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
   },
   headerSide: { minWidth: 36 },
+  headerSideEnd: { alignItems: 'flex-end' },
   title: {
     ...weekCardTitleStyle,
     fontWeight: '700',

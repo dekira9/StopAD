@@ -10,7 +10,7 @@ import { MedicationStockEditModal } from '@/components/medication-stock-edit-mod
 import { MedicationStockModal } from '@/components/medication-stock-modal';
 import type { AppLabels } from '@/constants/i18n';
 import { Fonts } from '@/constants/theme';
-import { formatSectionTitle, weekButtonTextStyle, weekCardTitleStyle, weekDayTitleStyle, weekServiceTextStyle } from '@/constants/typography';
+import { formatSectionTitle, weekButtonTextStyle, weekCardTitleStyle, weekServiceTextStyle } from '@/constants/typography';
 import { useAppChromeTheme } from '@/hooks/use-app-chrome-theme';
 import {
   formatMedicationLabel,
@@ -18,7 +18,9 @@ import {
   wellnessStore,
 } from '@/stores/wellness-store';
 
-const HEADER_HEIGHT = 48;
+const HEADER_TITLE_BLOCK = 30;
+const HEADER_TABS_EXTRA = 62;
+const HEADER_BOTTOM_PADDING = 12;
 
 type CatalogListTab = 'current' | 'completed';
 
@@ -118,6 +120,53 @@ function AllMedicationsModalShell({
   }, [entries]);
 
   const visibleEntries = listTab === 'current' ? currentEntries : completedEntries;
+  const showListTabs = entries.length > 0;
+  const headerHeight = showListTabs
+    ? HEADER_TITLE_BLOCK + HEADER_TABS_EXTRA
+    : HEADER_TITLE_BLOCK + HEADER_BOTTOM_PADDING;
+
+  const renderListTabs = () => (
+    <View
+      style={[
+        styles.listTabs,
+        {
+          backgroundColor: theme.sectionLabelBg,
+        },
+      ]}>
+      {(
+        [
+          { id: 'current' as const, label: labels.allMedicationsCurrent },
+          { id: 'completed' as const, label: labels.allMedicationsCompleted },
+        ] as const
+      ).map((tab) => {
+        const active = listTab === tab.id;
+        return (
+          <Pressable
+            key={tab.id}
+            onPress={() => setListTab(tab.id)}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: active }}
+            style={({ pressed }) => [
+              styles.listTabBtn,
+              active && [
+                styles.listTabBtnActive,
+                {
+                  backgroundColor: '#8A9BD2',
+                  shadowOpacity: isDark ? 0.25 : 0.08,
+                },
+              ],
+              pressed && styles.pressed,
+            ]}>
+            <Text
+              style={[styles.listTabLabel, { color: active ? '#FFFFFF' : theme.textSecondary }]}
+              numberOfLines={1}>
+              {tab.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
 
   const renderEntry = (entry: MedicationCatalogEntry) => {
     const label = catalogEntryMedicationLabel(entry);
@@ -170,7 +219,7 @@ function AllMedicationsModalShell({
             onPress={() => onOpenSchedule(entry)}
             style={({ pressed }) => [
               styles.actionBtn,
-              { borderColor: theme.inactiveBorder, backgroundColor: 'rgba(224,240,234,0.34)' },
+              { borderColor: theme.inactiveBorder, backgroundColor: '#F8F9FC' },
               pressed && styles.pressed,
             ]}>
             <ScheduleIcon size={22} color={theme.text} />
@@ -183,7 +232,7 @@ function AllMedicationsModalShell({
             onPress={() => setStockTarget(entry)}
             style={({ pressed }) => [
               styles.actionBtn,
-              { borderColor: theme.inactiveBorder, backgroundColor: 'rgba(252,236,216,0.34)' },
+              { borderColor: theme.inactiveBorder, backgroundColor: '#F8F9FC' },
               pressed && styles.pressed,
             ]}>
             <MedicineBottleIcon size={22} color={theme.text} />
@@ -224,65 +273,17 @@ function AllMedicationsModalShell({
               <BlurTargetView ref={blurTargetRef} style={styles.blurTarget}>
                 <ScrollView
                   style={styles.scroll}
-                  contentContainerStyle={[styles.scrollContent, { paddingTop: HEADER_HEIGHT + 8 }]}>
+                  contentContainerStyle={[styles.scrollContent, { paddingTop: headerHeight + 8 }]}>
                   {entries.length === 0 ? (
                     <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
                       {labels.allMedicationsEmpty}
                     </Text>
+                  ) : visibleEntries.length === 0 ? (
+                    <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+                      {labels.allMedicationsEmpty}
+                    </Text>
                   ) : (
-                    <>
-                      <View
-                        style={[
-                          styles.listTabs,
-                          {
-                            backgroundColor: theme.sectionLabelBg,
-                          },
-                        ]}>
-                        {(
-                          [
-                            { id: 'current' as const, label: labels.allMedicationsCurrent },
-                            { id: 'completed' as const, label: labels.allMedicationsCompleted },
-                          ] as const
-                        ).map((tab) => {
-                          const active = listTab === tab.id;
-                          return (
-                            <Pressable
-                              key={tab.id}
-                              onPress={() => setListTab(tab.id)}
-                              accessibilityRole="tab"
-                              accessibilityState={{ selected: active }}
-                              style={({ pressed }) => [
-                                styles.listTabBtn,
-                                active && [
-                                  styles.listTabBtnActive,
-                                  {
-                                    backgroundColor: '#8A9BD2',
-                                    shadowOpacity: isDark ? 0.25 : 0.08,
-                                  },
-                                ],
-                                pressed && styles.pressed,
-                              ]}>
-                              <Text
-                                style={[
-                                  styles.listTabLabel,
-                                  { color: active ? '#FFFFFF' : theme.textSecondary },
-                                ]}
-                                numberOfLines={1}>
-                                {tab.label}
-                              </Text>
-                            </Pressable>
-                          );
-                        })}
-                      </View>
-
-                      {visibleEntries.length === 0 ? (
-                        <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-                          {labels.allMedicationsEmpty}
-                        </Text>
-                      ) : (
-                        <View style={styles.section}>{visibleEntries.map(renderEntry)}</View>
-                      )}
-                    </>
+                    <View style={styles.section}>{visibleEntries.map(renderEntry)}</View>
                   )}
                 </ScrollView>
               </BlurTargetView>
@@ -299,12 +300,15 @@ function AllMedicationsModalShell({
                     { backgroundColor: isDark ? 'rgba(22,26,38,0.90)' : 'rgba(255,255,255,0.90)' },
                   ]}
                 />
-                <View style={styles.headerRow}>
-                  <View style={styles.headerBtn} />
-                  <Text style={[styles.title, { color: theme.text }]}>
-                    {formatSectionTitle(labels.allMedicationsTitle)}
-                  </Text>
-                  <View style={styles.headerBtn} />
+                <View style={styles.headerContent}>
+                  <View style={styles.headerRow}>
+                    <View style={styles.headerBtn} />
+                    <Text style={[styles.title, { color: theme.text }]}>
+                      {formatSectionTitle(labels.allMedicationsTitle)}
+                    </Text>
+                    <View style={styles.headerBtn} />
+                  </View>
+                  {showListTabs ? renderListTabs() : null}
                 </View>
               </BlurView>
 
@@ -439,7 +443,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
     borderWidth: 1,
     paddingTop: 0,
-    paddingBottom: 24,
+    paddingBottom: 5,
     overflow: 'hidden',
   },
   headerGlass: {
@@ -460,14 +464,17 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
   },
+  headerContent: {
+    gap: 10,
+    paddingBottom: 12,
+  },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    minHeight: HEADER_HEIGHT,
+    minHeight: HEADER_TITLE_BLOCK,
     paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 12,
+    paddingTop: 5,
   },
   headerBtn: { minWidth: 28, alignItems: 'flex-end' },
   title: {
@@ -494,6 +501,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     padding: 3,
     gap: 0,
+    marginHorizontal: 16,
   },
   listTabBtn: {
     flex: 1,
