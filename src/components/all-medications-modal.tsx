@@ -9,7 +9,7 @@ import { MedicationRefillReminderModal } from '@/components/medication-refill-re
 import { MedicationStockEditModal } from '@/components/medication-stock-edit-modal';
 import { MedicationStockModal } from '@/components/medication-stock-modal';
 import type { AppLabels } from '@/constants/i18n';
-import { Fonts } from '@/constants/theme';
+import { Colors, Fonts } from '@/constants/theme';
 import { formatSectionTitle, weekButtonTextStyle, weekCardTitleStyle, weekServiceTextStyle } from '@/constants/typography';
 import { useAppChromeTheme } from '@/hooks/use-app-chrome-theme';
 import {
@@ -18,7 +18,7 @@ import {
   wellnessStore,
 } from '@/stores/wellness-store';
 
-const HEADER_TITLE_BLOCK = 30;
+const HEADER_TITLE_BLOCK = 40;
 const HEADER_TABS_EXTRA = 62;
 const HEADER_BOTTOM_PADDING = 12;
 
@@ -55,7 +55,7 @@ function AllMedicationsModalShell({
   initialStockCatalogId,
   onInitialStockHandled,
 }: ShellProps) {
-  const { modal: theme, isDark } = useAppChromeTheme();
+  const { modal: theme, chrome: ui, isDark } = useAppChromeTheme();
   const blurTargetRef = useRef<View | null>(null);
   const [initialState] = useState(() => {
     const initialEntries = loadVisibleMedicationEntries();
@@ -124,6 +124,7 @@ function AllMedicationsModalShell({
   const headerHeight = showListTabs
     ? HEADER_TITLE_BLOCK + HEADER_TABS_EXTRA
     : HEADER_TITLE_BLOCK + HEADER_BOTTOM_PADDING;
+  const contentBg = isDark ? theme.modalBg : Colors.light.background;
 
   const renderListTabs = () => (
     <View
@@ -270,10 +271,13 @@ function AllMedicationsModalShell({
             />
           ) : (
             <View style={[styles.card, { backgroundColor: theme.modalBg, borderColor: theme.subtlePanelBorder }]}>
-              <BlurTargetView ref={blurTargetRef} style={styles.blurTarget}>
+              <BlurTargetView ref={blurTargetRef} style={[styles.blurTarget, { backgroundColor: contentBg }]}>
                 <ScrollView
-                  style={styles.scroll}
-                  contentContainerStyle={[styles.scrollContent, { paddingTop: headerHeight + 8 }]}>
+                  style={[styles.scroll, { backgroundColor: contentBg }]}
+                  contentContainerStyle={[
+                    styles.scrollContent,
+                    { paddingTop: headerHeight + 8, backgroundColor: contentBg },
+                  ]}>
                   {entries.length === 0 ? (
                     <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
                       {labels.allMedicationsEmpty}
@@ -288,31 +292,54 @@ function AllMedicationsModalShell({
                 </ScrollView>
               </BlurTargetView>
 
-              <BlurView
-                blurTarget={blurTargetRef}
-                blurMethod="dimezisBlurViewSdk31Plus"
-                intensity={42}
-                tint={isDark ? 'dark' : 'light'}
-                style={[styles.headerGlass, { borderBottomColor: theme.subtlePanelBorder }]}>
-                <View
-                  style={[
-                    styles.headerGlassTint,
-                    { backgroundColor: isDark ? 'rgba(22,26,38,0.90)' : 'rgba(255,255,255,0.90)' },
-                  ]}
-                />
-                <View style={styles.headerContent}>
-                  <View style={styles.headerRow}>
-                    <View style={styles.headerBtn} />
-                    <Text style={[styles.title, { color: theme.text }]}>
-                      {formatSectionTitle(labels.allMedicationsTitle)}
-                    </Text>
-                    <View style={styles.headerBtn} />
+              <View style={styles.headerChrome}>
+                <BlurView
+                  blurTarget={blurTargetRef}
+                  blurMethod="dimezisBlurViewSdk31Plus"
+                  intensity={42}
+                  tint={isDark ? 'dark' : 'light'}
+                  style={[styles.headerGlass, { borderBottomColor: theme.subtlePanelBorder }]}>
+                  <View
+                    style={[
+                      styles.headerGlassTint,
+                      { backgroundColor: isDark ? 'rgba(22,26,38,0.90)' : 'rgba(255,255,255,0.90)' },
+                    ]}
+                  />
+                  <View style={styles.headerContent}>
+                    <View style={styles.headerRow}>
+                      <View style={styles.headerBtn} />
+                      <Text style={[styles.title, { color: theme.text }]}>
+                        {formatSectionTitle(labels.allMedicationsTitle)}
+                      </Text>
+                      <View style={styles.headerBtn} />
+                    </View>
+                    {showListTabs ? renderListTabs() : null}
                   </View>
-                  {showListTabs ? renderListTabs() : null}
+                </BlurView>
+                <View pointerEvents="none" style={styles.headerDownShadow}>
+                  <View
+                    style={[styles.headerDownShadowBand, { bottom: -2, opacity: ui.panelEdgeShadow * 1.3 }]}
+                  />
+                  <View
+                    style={[styles.headerDownShadowBand, { bottom: -4, opacity: ui.panelEdgeShadow * 0.9 }]}
+                  />
+                  <View
+                    style={[styles.headerDownShadowBand, { bottom: -6, opacity: ui.panelEdgeShadow * 0.55 }]}
+                  />
                 </View>
-              </BlurView>
+              </View>
 
-              <View style={[styles.footer, { backgroundColor: theme.modalBg }]}>
+              <View
+                style={[
+                  styles.footerChrome,
+                  { borderColor: theme.subtlePanelBorder, backgroundColor: theme.modalBg },
+                ]}>
+                <View pointerEvents="none" style={styles.footerUpShadow}>
+                  <View style={[styles.footerUpShadowBand, { top: -2, opacity: ui.panelEdgeShadow * 1.3 }]} />
+                  <View style={[styles.footerUpShadowBand, { top: -4, opacity: ui.panelEdgeShadow * 0.9 }]} />
+                  <View style={[styles.footerUpShadowBand, { top: -6, opacity: ui.panelEdgeShadow * 0.55 }]} />
+                </View>
+                <View style={[styles.footer, { shadowOpacity: ui.panelEdgeShadow }]}>
                 <Pressable
                   onPress={onAddMedication}
                   style={({ pressed }) => [
@@ -347,6 +374,7 @@ function AllMedicationsModalShell({
                   <Ionicons name="checkmark-circle" size={20} color={theme.activeText} />
                   <Text style={[styles.doneButtonText, { color: theme.activeText }]}>{labels.done}</Text>
                 </Pressable>
+                </View>
               </View>
             </View>
           )}
@@ -443,15 +471,17 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
     borderWidth: 1,
     paddingTop: 0,
-    paddingBottom: 5,
+    paddingBottom: 10,
     overflow: 'hidden',
   },
-  headerGlass: {
+  headerChrome: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     zIndex: 2,
+  },
+  headerGlass: {
     overflow: 'hidden',
     borderTopLeftRadius: 19,
     borderTopRightRadius: 19,
@@ -467,6 +497,21 @@ const styles = StyleSheet.create({
   headerContent: {
     gap: 10,
     paddingBottom: 12,
+  },
+  headerDownShadow: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 1,
+    zIndex: 1,
+  },
+  headerDownShadowBand: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: '#000',
   },
   headerRow: {
     flexDirection: 'row',
@@ -574,13 +619,36 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     textAlign: 'left',
   },
-  footer: {
+  footerChrome: {
     flexGrow: 0,
     flexShrink: 0,
+    position: 'relative',
+    borderTopWidth: StyleSheet.hairlineWidth,
     zIndex: 3,
+  },
+  footerUpShadow: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    height: 1,
+    zIndex: 1,
+  },
+  footerUpShadowBand: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: '#000',
+  },
+  footer: {
     paddingHorizontal: 16,
     paddingTop: 8,
     gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -3 },
+    shadowRadius: 4,
+    elevation: 3,
   },
   addButton: {
     flexDirection: 'row',

@@ -5,9 +5,9 @@ import { Image } from 'expo-image';
 import { useMemo, useState, type ReactNode } from 'react';
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
+import { BellOffIcon, BellOnIcon } from '@/components/medical-ui-icons';
 import { MedicationDatePickerModal } from '@/components/medication-date-picker-modal';
 import { MedicationIntakeDaysModal } from '@/components/medication-intake-days-modal';
-import { BellOffIcon, BellOnIcon } from '@/components/medical-ui-icons';
 import { formatTimeValue, MedicationTimePickerModal, parseTimeValue } from '@/components/medication-time-picker-modal';
 import type { AppLabels } from '@/constants/i18n';
 import { Fonts } from '@/constants/theme';
@@ -142,6 +142,7 @@ export function MedicationScheduleModal({
   onCreate,
 }: Props) {
   const { modal: theme, chrome } = useAppChromeTheme();
+  const contentBg = theme.modalBg;
   const isCreate = mode === 'create';
   const initialParts = parseMedicationLabel(medication);
   const [localName, setLocalName] = useState(initialParts.name);
@@ -278,25 +279,40 @@ export function MedicationScheduleModal({
       <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
         <View style={[styles.overlay, { backgroundColor: theme.modalOverlay }]}>
           <View style={[styles.card, { backgroundColor: theme.modalBg, borderColor: theme.subtlePanelBorder }]}>
-            <View style={styles.handleWrap}>
-              <View style={[styles.handle, { backgroundColor: theme.subtlePanelBorder }]} />
+            <View style={styles.headerChrome}>
+              <View
+                style={[
+                  styles.headerSurface,
+                  { backgroundColor: theme.modalBg, borderBottomColor: theme.subtlePanelBorder },
+                ]}>
+                <View style={styles.handleWrap}>
+                  <View style={[styles.handle, { backgroundColor: theme.subtlePanelBorder }]} />
+                </View>
+
+                <View style={styles.headerRow}>
+                  <View style={styles.headerSide} />
+                  <Text style={[styles.title, { color: theme.text }]}>
+                    {formatSectionTitle(labels.medicationScheduleTitle)}
+                  </Text>
+                  <Pressable
+                    onPress={onClose}
+                    hitSlop={8}
+                    accessibilityLabel={labels.repeatCancel}
+                    style={({ pressed }) => [styles.headerSide, styles.headerSideEnd, pressed && styles.pressed]}>
+                    <Ionicons name="close" size={20} color={theme.text} />
+                  </Pressable>
+                </View>
+              </View>
+              <View pointerEvents="none" style={styles.headerDownShadow}>
+                <View style={[styles.headerDownShadowBand, { bottom: -2, opacity: chrome.panelEdgeShadow * 1.3 }]} />
+                <View style={[styles.headerDownShadowBand, { bottom: -4, opacity: chrome.panelEdgeShadow * 0.9 }]} />
+                <View style={[styles.headerDownShadowBand, { bottom: -6, opacity: chrome.panelEdgeShadow * 0.55 }]} />
+              </View>
             </View>
 
-            <View style={styles.headerRow}>
-              <View style={styles.headerSide} />
-              <Text style={[styles.title, { color: theme.text }]}>
-                {formatSectionTitle(labels.medicationScheduleTitle)}
-              </Text>
-              <Pressable
-                onPress={onClose}
-                hitSlop={8}
-                accessibilityLabel={labels.repeatCancel}
-                style={({ pressed }) => [styles.headerSide, styles.headerSideEnd, pressed && styles.pressed]}>
-                <Ionicons name="close" size={20} color={theme.text} />
-              </Pressable>
-            </View>
-
-            <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+            <ScrollView
+              style={[styles.scroll, { backgroundColor: contentBg }]}
+              contentContainerStyle={[styles.scrollContent, { backgroundColor: contentBg }]}>
               <View
                 style={[
                   styles.fieldsCard,
@@ -578,7 +594,17 @@ export function MedicationScheduleModal({
               )}
             </ScrollView>
 
-            <View style={[styles.footer, { borderTopColor: theme.subtlePanelBorder, backgroundColor: theme.modalBg }]}>
+            <View
+              style={[
+                styles.footerChrome,
+                { borderColor: theme.subtlePanelBorder, backgroundColor: theme.modalBg },
+              ]}>
+              <View pointerEvents="none" style={styles.footerUpShadow}>
+                <View style={[styles.footerUpShadowBand, { top: -2, opacity: chrome.panelEdgeShadow * 1.3 }]} />
+                <View style={[styles.footerUpShadowBand, { top: -4, opacity: chrome.panelEdgeShadow * 0.9 }]} />
+                <View style={[styles.footerUpShadowBand, { top: -6, opacity: chrome.panelEdgeShadow * 0.55 }]} />
+              </View>
+              <View style={styles.footer}>
               <Pressable
                 onPress={handleDone}
                 disabled={isCreate && !canSave}
@@ -597,6 +623,7 @@ export function MedicationScheduleModal({
                   {labels.medicationScheduleSave}
                 </Text>
               </Pressable>
+              </View>
             </View>
 
             <MedicationIntakeDaysModal
@@ -682,7 +709,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
     borderWidth: 1,
     paddingTop: 4,
-    paddingBottom: 16,
+    paddingBottom: 10,
     overflow: 'hidden',
   },
   handleWrap: {
@@ -694,6 +721,28 @@ const styles = StyleSheet.create({
     width: 36,
     height: 4,
     borderRadius: 2,
+  },
+  headerChrome: {
+    position: 'relative',
+    zIndex: 2,
+  },
+  headerSurface: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  headerDownShadow: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 1,
+    zIndex: 1,
+  },
+  headerDownShadowBand: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: '#000',
   },
   headerRow: {
     flexDirection: 'row',
@@ -861,12 +910,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  footerChrome: {
+    position: 'relative',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    zIndex: 3,
+    overflow: 'visible',
+  },
+  footerUpShadow: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    height: 1,
+    zIndex: 2,
+  },
+  footerUpShadowBand: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: '#000',
+  },
   footer: {
     paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 8,
+    paddingTop: 8,
     gap: 4,
-    borderTopWidth: StyleSheet.hairlineWidth,
   },
   doneButton: {
     flexDirection: 'row',

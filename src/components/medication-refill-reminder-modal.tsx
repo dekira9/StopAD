@@ -213,7 +213,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
     borderWidth: 1,
     paddingTop: 4,
-    paddingBottom: 16,
+    paddingBottom: 10,
     overflow: 'hidden',
   },
   handleWrap: {
@@ -354,9 +354,7 @@ const styles = StyleSheet.create({
   },
   footer: {
     paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 8,
-    gap: 4,
+    paddingTop: 8,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   saveButton: {
@@ -366,6 +364,7 @@ const styles = StyleSheet.create({
     gap: 8,
     borderRadius: 999,
     borderWidth: 1,
+    minHeight: 48,
     paddingVertical: 14,
     shadowColor: '#000',
     shadowRadius: 4,

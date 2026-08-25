@@ -61,7 +61,7 @@ function MedicationStockEditModalContent({
   onClose,
   onSave,
 }: ContentProps) {
-  const { modal: theme, chrome } = useAppChromeTheme();
+  const { modal: theme, chrome: ui } = useAppChromeTheme();
   const language = wellnessStore.preferredLanguage ?? 'en';
   const locale = LANGUAGES[language].locale;
   const [remaining, setRemaining] = useState(
@@ -95,22 +95,35 @@ function MedicationStockEditModalContent({
   return (
     <View style={[styles.overlay, { backgroundColor: theme.modalOverlay }]}>
       <View style={[styles.card, { backgroundColor: theme.modalBg, borderColor: theme.subtlePanelBorder }]}>
-        <View style={styles.handleWrap}>
-          <View style={[styles.handle, { backgroundColor: theme.subtlePanelBorder }]} />
-        </View>
+        <View style={styles.headerChrome}>
+          <View
+            style={[
+              styles.headerSurface,
+              { backgroundColor: theme.modalBg, borderBottomColor: theme.subtlePanelBorder },
+            ]}>
+            <View style={styles.handleWrap}>
+              <View style={[styles.handle, { backgroundColor: theme.subtlePanelBorder }]} />
+            </View>
 
-        <View style={styles.headerRow}>
-          <View style={styles.headerSide} />
-          <Text style={[styles.title, { color: theme.text }]}>
-            {formatSectionTitle(labels.medicationStockButton)}
-          </Text>
-          <Pressable
-            onPress={onClose}
-            hitSlop={8}
-            accessibilityLabel={labels.done}
-            style={({ pressed }) => [styles.headerSide, styles.headerSideEnd, pressed && styles.pressed]}>
-            <Ionicons name="close" size={20} color={theme.text} />
-          </Pressable>
+            <View style={styles.headerRow}>
+              <View style={styles.headerSide} />
+              <Text style={[styles.title, { color: theme.text }]}>
+                {formatSectionTitle(labels.medicationStockButton)}
+              </Text>
+              <Pressable
+                onPress={onClose}
+                hitSlop={8}
+                accessibilityLabel={labels.done}
+                style={({ pressed }) => [styles.headerSide, styles.headerSideEnd, pressed && styles.pressed]}>
+                <Ionicons name="close" size={20} color={theme.text} />
+              </Pressable>
+            </View>
+          </View>
+          <View pointerEvents="none" style={styles.headerDownShadow}>
+            <View style={[styles.headerDownShadowBand, { bottom: -2, opacity: ui.panelEdgeShadow * 1.3 }]} />
+            <View style={[styles.headerDownShadowBand, { bottom: -4, opacity: ui.panelEdgeShadow * 0.9 }]} />
+            <View style={[styles.headerDownShadowBand, { bottom: -6, opacity: ui.panelEdgeShadow * 0.55 }]} />
+          </View>
         </View>
 
         <ScrollView
@@ -155,7 +168,7 @@ function MedicationStockEditModalContent({
                 placeholderTextColor={theme.iconMuted}
                 style={[
                   styles.remainingInput,
-                  { color: chrome.medicationFieldText, borderColor: theme.rowBorder },
+                  { color: ui.medicationFieldText, borderColor: theme.rowBorder },
                 ]}
               />
             </View>
@@ -195,7 +208,7 @@ function MedicationStockEditModalContent({
                   maxLength={5}
                   style={[
                     styles.remainingInput,
-                    { color: chrome.medicationFieldText, borderColor: theme.rowBorder },
+                    { color: ui.medicationFieldText, borderColor: theme.rowBorder },
                   ]}
                 />
               </View>
@@ -235,7 +248,7 @@ function MedicationStockEditModalContent({
                 placeholderTextColor={theme.iconMuted}
                 style={[
                   styles.remainingInput,
-                  { color: chrome.medicationFieldText, borderColor: theme.rowBorder },
+                  { color: ui.medicationFieldText, borderColor: theme.rowBorder },
                 ]}
               />
             </View>
@@ -247,19 +260,29 @@ function MedicationStockEditModalContent({
               styles.totalRow,
               {
                 backgroundColor: theme.sectionLabelBg,
-                borderColor: chrome.dayBorder,
+                borderColor: ui.dayBorder,
               },
             ]}>
             <Text style={[styles.panelHeaderText, { color: theme.text }]}>
               {formatSectionTitle(labels.medicationStockTotal)}
             </Text>
-            <Text style={[styles.totalValue, { color: chrome.medicationFieldText }]}>
+            <Text style={[styles.totalValue, { color: ui.medicationFieldText }]}>
               {hasStockInput ? total : (initialRemaining ?? 0)}
             </Text>
           </View>
         </ScrollView>
 
-        <View style={[styles.footer, { borderTopColor: theme.subtlePanelBorder, backgroundColor: theme.modalBg }]}>
+        <View
+          style={[
+            styles.footerChrome,
+            { borderColor: theme.subtlePanelBorder, backgroundColor: theme.modalBg },
+          ]}>
+          <View pointerEvents="none" style={styles.footerUpShadow}>
+            <View style={[styles.footerUpShadowBand, { top: -2, opacity: ui.panelEdgeShadow * 1.3 }]} />
+            <View style={[styles.footerUpShadowBand, { top: -4, opacity: ui.panelEdgeShadow * 0.9 }]} />
+            <View style={[styles.footerUpShadowBand, { top: -6, opacity: ui.panelEdgeShadow * 0.55 }]} />
+          </View>
+          <View style={[styles.footer, { shadowOpacity: ui.panelEdgeShadow }]}>
           <Pressable
             onPress={() => {
               if (!canSave) return;
@@ -291,6 +314,7 @@ function MedicationStockEditModalContent({
               {labels.medicationStockSave}
             </Text>
           </Pressable>
+          </View>
         </View>
       </View>
     </View>
@@ -319,7 +343,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
     borderWidth: 1,
     paddingTop: 4,
-    paddingBottom: 16,
+    paddingBottom: 10,
     overflow: 'hidden',
   },
   handleWrap: {
@@ -331,6 +355,28 @@ const styles = StyleSheet.create({
     width: 36,
     height: 4,
     borderRadius: 2,
+  },
+  headerChrome: {
+    position: 'relative',
+    zIndex: 2,
+  },
+  headerSurface: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  headerDownShadow: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 1,
+    zIndex: 1,
+  },
+  headerDownShadowBand: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: '#000',
   },
   headerRow: {
     flexDirection: 'row',
@@ -458,17 +504,40 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.sansSemiBold,
     fontWeight: '700',
   },
+  footerChrome: {
+    position: 'relative',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    zIndex: 3,
+  },
+  footerUpShadow: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    height: 1,
+    zIndex: 1,
+  },
+  footerUpShadowBand: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: '#000',
+  },
   footer: {
     paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 8,
-    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -3 },
+    shadowRadius: 4,
+    elevation: 3,
   },
   saveButton: {
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 999,
     borderWidth: 1,
+    minHeight: 48,
     paddingVertical: 14,
     shadowColor: '#000',
     shadowRadius: 4,
