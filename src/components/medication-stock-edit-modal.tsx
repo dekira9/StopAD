@@ -16,6 +16,7 @@ import {
   weekServiceTextStyle,
 } from '@/constants/typography';
 import { useAppChromeTheme } from '@/hooks/use-app-chrome-theme';
+import { useKeyboardBottomInset } from '@/hooks/use-keyboard-bottom-inset';
 import { wellnessStore } from '@/stores/wellness-store';
 import { formatDayMonth } from '@/utils/date-format';
 
@@ -64,6 +65,7 @@ function MedicationStockEditModalContent({
 }: ContentProps) {
   const { modal: theme, chrome: ui } = useAppChromeTheme();
   const insets = useSafeAreaInsets();
+  const keyboardHeight = useKeyboardBottomInset();
   const language = wellnessStore.preferredLanguage ?? 'en';
   const locale = LANGUAGES[language].locale;
   const [remaining, setRemaining] = useState(
@@ -95,7 +97,15 @@ function MedicationStockEditModalContent({
   }, [initialLastRefillCount, initialLastRefillDateKey, labels.medicationStockLastRefill, locale]);
 
   return (
-    <View style={[styles.overlay, { backgroundColor: theme.modalOverlay }]}>
+    <View
+      style={[
+        styles.overlay,
+        {
+          backgroundColor: theme.modalOverlay,
+          // Lift the bottom sheet above the keyboard (Modal windows ignore adjustResize).
+          paddingBottom: keyboardHeight,
+        },
+      ]}>
       <View style={[styles.card, { backgroundColor: theme.modalBg, borderColor: theme.subtlePanelBorder }]}>
         <View style={styles.headerChrome}>
           <View
@@ -132,6 +142,7 @@ function MedicationStockEditModalContent({
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           showsVerticalScrollIndicator={false}>
           <View style={styles.hintRow}>
             <Image
@@ -285,7 +296,14 @@ function MedicationStockEditModalContent({
             <View style={[styles.footerUpShadowBand, { top: -6, opacity: ui.panelEdgeShadow * 0.55 }]} />
           </View>
           <View
-            style={[styles.footer, { shadowOpacity: ui.panelEdgeShadow, paddingBottom: insets.bottom }]}>
+            style={[
+              styles.footer,
+              {
+                shadowOpacity: ui.panelEdgeShadow,
+                // Safe-area padding is redundant while the keyboard occupies that space.
+                paddingBottom: keyboardHeight > 0 ? 8 : insets.bottom,
+              },
+            ]}>
           <Pressable
             onPress={() => {
               if (!canSave) return;

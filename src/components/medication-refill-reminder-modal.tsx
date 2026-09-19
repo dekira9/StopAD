@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useState } from 'react';
-import { Modal, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { AppLabels } from '@/constants/i18n';
@@ -13,6 +13,7 @@ import {
   weekServiceTextStyle,
 } from '@/constants/typography';
 import { useAppChromeTheme } from '@/hooks/use-app-chrome-theme';
+import { useKeyboardBottomInset } from '@/hooks/use-keyboard-bottom-inset';
 
 /** Resize pills-remaining.png here (numeric px). */
 const PILLS_REMAINING_WIDTH = 130;
@@ -53,11 +54,19 @@ function MedicationRefillReminderModalContent({
 }: ContentProps) {
   const { modal: theme, chrome } = useAppChromeTheme();
   const insets = useSafeAreaInsets();
+  const keyboardHeight = useKeyboardBottomInset();
   const [enabled, setEnabled] = useState(initialEnabled);
   const [count, setCount] = useState(initialCount !== undefined ? String(initialCount) : '');
 
   return (
-    <View style={[styles.overlay, { backgroundColor: theme.modalOverlay }]}>
+    <View
+      style={[
+        styles.overlay,
+        {
+          backgroundColor: theme.modalOverlay,
+          paddingBottom: keyboardHeight,
+        },
+      ]}>
       <View style={[styles.card, { backgroundColor: theme.modalBg, borderColor: theme.subtlePanelBorder }]}>
         <View style={styles.handleWrap}>
           <View style={[styles.handle, { backgroundColor: theme.subtlePanelBorder }]} />
@@ -87,7 +96,12 @@ function MedicationRefillReminderModalContent({
           </Pressable>
         </View>
 
-        <View style={styles.content}>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          showsVerticalScrollIndicator={false}>
           <View
             style={[
               styles.thresholdCard,
@@ -165,7 +179,7 @@ function MedicationRefillReminderModalContent({
               </Text>
             ) : null}
           </View>
-        </View>
+        </ScrollView>
 
         <View
           style={[
@@ -173,7 +187,7 @@ function MedicationRefillReminderModalContent({
             {
               borderTopColor: theme.subtlePanelBorder,
               backgroundColor: theme.modalBg,
-              paddingBottom: insets.bottom,
+              paddingBottom: keyboardHeight > 0 ? 8 : insets.bottom,
             },
           ]}>
           <Pressable
@@ -219,6 +233,7 @@ const styles = StyleSheet.create({
   },
   card: {
     maxHeight: '92%',
+    flexShrink: 1,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     borderWidth: 1,
@@ -265,6 +280,11 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     lineHeight: 16,
     textAlign: 'left',
+  },
+  scroll: {
+    flexGrow: 0,
+    flexShrink: 1,
+    minHeight: 0,
   },
   content: {
     paddingHorizontal: 16,
