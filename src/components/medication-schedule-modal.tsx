@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import type { Locale } from 'date-fns';
-import { addMonths, format, parse } from 'date-fns';
+import { parse } from 'date-fns';
 import { Image } from 'expo-image';
 import { useMemo, useState, type ReactNode } from 'react';
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BellOffIcon, BellOnIcon } from '@/components/medical-ui-icons';
 import { MedicationDatePickerModal } from '@/components/medication-date-picker-modal';
@@ -27,7 +28,7 @@ export type MedicationScheduleCreatePayload = {
   times: string[];
   repeat: MedicationRepeatConfig;
   startDateKey: string;
-  endDateKey?: string | null;
+  endDateKey: string;
   reminderEnabled: boolean;
 };
 
@@ -47,7 +48,7 @@ type Props = {
   onDelete: () => void;
   onUpdateRepeat: (repeat: MedicationRepeatConfig) => void;
   onUpdateTimes: (times: string[]) => void;
-  onUpdateDuration: (updates: { startDateKey?: string; endDateKey?: string | null }) => void;
+  onUpdateDuration: (updates: { startDateKey?: string; endDateKey?: string }) => void;
   onUpdateMedication?: (medication: string) => void;
   onUpdateReminder?: (enabled: boolean) => void;
   onCreate?: (payload: MedicationScheduleCreatePayload) => void;
@@ -142,6 +143,7 @@ export function MedicationScheduleModal({
   onCreate,
 }: Props) {
   const { modal: theme, chrome } = useAppChromeTheme();
+  const insets = useSafeAreaInsets();
   const contentBg = theme.modalBg;
   const isCreate = mode === 'create';
   const initialParts = parseMedicationLabel(medication);
@@ -155,10 +157,9 @@ export function MedicationScheduleModal({
   const [localIntakeSummary, setLocalIntakeSummary] = useState(intakeDaysSummary);
   const [localReminderEnabled, setLocalReminderEnabled] = useState(reminderEnabled);
   const [localStartKey, setLocalStartKey] = useState(() => repeat.startDateKey ?? durationStartKey);
-  const [localEndKey, setLocalEndKey] = useState<string | null | undefined>(() => {
-    const initialStartKey = repeat.startDateKey ?? durationStartKey;
-    return repeat.endDateKey === undefined ? initialStartKey : repeat.endDateKey;
-  });
+  const [localEndKey, setLocalEndKey] = useState<string>(
+    () => repeat.endDateKey ?? repeat.startDateKey ?? durationStartKey,
+  );
 
   const medicationLabel = formatMedicationLabel(localName, localDose);
   const canSave = medicationLabel.trim().length > 0 && localTimes.some((time) => time.trim());
@@ -166,19 +167,11 @@ export function MedicationScheduleModal({
 
   const durationDates = useMemo(() => {
     const start = parse(localStartKey, 'yyyy-MM-dd', new Date());
-    const endLabel =
-      localEndKey === null
-        ? labels.medicationScheduleNoEnd
-        : localEndKey
-          ? formatDayMonth(parse(localEndKey, 'yyyy-MM-dd', new Date()), locale)
-          : formatDayMonth(addMonths(start, localRepeat.months), locale);
-
     return {
       startLabel: formatDayMonth(start, locale),
-      endLabel,
-      endIsNone: localEndKey === null,
+      endLabel: formatDayMonth(parse(localEndKey, 'yyyy-MM-dd', new Date()), locale),
     };
-  }, [localStartKey, localEndKey, localRepeat.months, locale, labels.medicationScheduleNoEnd]);
+  }, [localStartKey, localEndKey, locale]);
 
   const syncMedicationLabel = (name: string, dose: string) => {
     const nextLabel = formatMedicationLabel(name, dose).trim();
@@ -249,13 +242,7 @@ export function MedicationScheduleModal({
       onUpdateMedication?.(nextLabel);
     }
 
-    const updates: { startDateKey?: string; endDateKey?: string | null } = {
-      startDateKey: localStartKey,
-    };
-    if (localEndKey !== undefined) {
-      updates.endDateKey = localEndKey;
-    }
-    onUpdateDuration(updates);
+    onUpdateDuration({ startDateKey: localStartKey, endDateKey: localEndKey });
     onClose();
   };
 
@@ -274,9 +261,10 @@ export function MedicationScheduleModal({
     );
   };
 
+  // Prefer overlay pickers inside this Modal (iOS cannot stack Modals cleanly).
   return (
-    <>
-      <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
+    <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
+      <View style={styles.root}>
         <View style={[styles.overlay, { backgroundColor: theme.modalOverlay }]}>
           <View style={[styles.card, { backgroundColor: theme.modalBg, borderColor: theme.subtlePanelBorder }]}>
             <View style={styles.headerChrome}>
@@ -496,13 +484,7 @@ export function MedicationScheduleModal({
                         WHITE_BOX,
                         pressed && styles.pressed,
                       ]}>
-                      <Text
-                        style={[
-                          styles.fieldValue,
-                          {
-                            color: durationDates.endIsNone ? theme.textSecondary : theme.inactiveText,
-                          },
-                        ]}>
+                      <Text style={[styles.fieldValue, { color: theme.inactiveText }]}>
                         {durationDates.endLabel}
                       </Text>
                       <View style={styles.sheetRowTrailing}>
@@ -604,7 +586,7 @@ export function MedicationScheduleModal({
                 <View style={[styles.footerUpShadowBand, { top: -4, opacity: chrome.panelEdgeShadow * 0.9 }]} />
                 <View style={[styles.footerUpShadowBand, { top: -6, opacity: chrome.panelEdgeShadow * 0.55 }]} />
               </View>
-              <View style={styles.footer}>
+              <View style={[styles.footer, { paddingBottom: insets.bottom }]}>
               <Pressable
                 onPress={handleDone}
                 disabled={isCreate && !canSave}
@@ -625,83 +607,73 @@ export function MedicationScheduleModal({
               </Pressable>
               </View>
             </View>
-
-            <MedicationIntakeDaysModal
-              embedded
-              visible={showIntakeDaysPicker}
-              labels={labels}
-              weekdayLabels={weekdayLabels}
-              initialRepeat={localRepeat}
-              onClose={() => setShowIntakeDaysPicker(false)}
-              onApply={handleUpdateRepeat}
-            />
           </View>
         </View>
-      </Modal>
 
-      <MedicationTimePickerModal
-        visible={timePickerIndex !== null}
-        title={labels.medicationScheduleTime}
-        labels={labels}
-        initialTime={timePickerIndex !== null ? localTimes[timePickerIndex] : formatTimeValue(new Date())}
-        onClose={() => setTimePickerIndex(null)}
-        onSelect={(time) => {
-          if (timePickerIndex === null) return;
-          updateTimeAt(timePickerIndex, time);
-        }}
-      />
+        <MedicationIntakeDaysModal
+          embedded
+          visible={showIntakeDaysPicker}
+          labels={labels}
+          weekdayLabels={weekdayLabels}
+          initialRepeat={localRepeat}
+          onClose={() => setShowIntakeDaysPicker(false)}
+          onApply={handleUpdateRepeat}
+        />
 
-      <MedicationDatePickerModal
-        visible={datePickerTarget === 'start'}
-        title={labels.medicationScheduleStart}
-        labels={labels}
-        locale={locale}
-        selectedDateKey={localStartKey}
-        onClose={() => setDatePickerTarget(null)}
-        onSelect={(dateKey) => {
-          const nextEndKey =
-            localEndKey === undefined || (typeof localEndKey === 'string' && localEndKey < dateKey)
-              ? dateKey
-              : localEndKey;
-          setLocalStartKey(dateKey);
-          setLocalEndKey(nextEndKey);
-          if (!isCreate) {
-            onUpdateDuration({ startDateKey: dateKey, endDateKey: nextEndKey });
-          }
-        }}
-      />
+        <MedicationTimePickerModal
+          embedded
+          visible={timePickerIndex !== null}
+          title={labels.medicationScheduleTime}
+          labels={labels}
+          initialTime={timePickerIndex !== null ? localTimes[timePickerIndex] : formatTimeValue(new Date())}
+          onClose={() => setTimePickerIndex(null)}
+          onSelect={(time) => {
+            if (timePickerIndex === null) return;
+            updateTimeAt(timePickerIndex, time);
+          }}
+        />
 
-      <MedicationDatePickerModal
-        visible={datePickerTarget === 'end'}
-        title={labels.medicationScheduleEnd}
-        labels={labels}
-        locale={locale}
-        selectedDateKey={
-          localEndKey && typeof localEndKey === 'string'
-            ? localEndKey
-            : format(addMonths(parse(localStartKey, 'yyyy-MM-dd', new Date()), localRepeat.months), 'yyyy-MM-dd')
-        }
-        minimumDateKey={localStartKey}
-        allowNone
-        onClose={() => setDatePickerTarget(null)}
-        onSelect={(dateKey) => {
-          setLocalEndKey(dateKey);
-          if (!isCreate) {
-            onUpdateDuration({ endDateKey: dateKey });
-          }
-        }}
-        onSelectNone={() => {
-          setLocalEndKey(null);
-          if (!isCreate) {
-            onUpdateDuration({ endDateKey: null });
-          }
-        }}
-      />
-    </>
+        <MedicationDatePickerModal
+          embedded
+          visible={datePickerTarget === 'start'}
+          title={labels.medicationScheduleStart}
+          labels={labels}
+          locale={locale}
+          selectedDateKey={localStartKey}
+          onClose={() => setDatePickerTarget(null)}
+          onSelect={(dateKey) => {
+            const nextEndKey = localEndKey < dateKey ? dateKey : localEndKey;
+            setLocalStartKey(dateKey);
+            setLocalEndKey(nextEndKey);
+            if (!isCreate) {
+              onUpdateDuration({ startDateKey: dateKey, endDateKey: nextEndKey });
+            }
+          }}
+        />
+
+        <MedicationDatePickerModal
+          embedded
+          visible={datePickerTarget === 'end'}
+          title={labels.medicationScheduleEnd}
+          labels={labels}
+          locale={locale}
+          selectedDateKey={localEndKey}
+          minimumDateKey={localStartKey}
+          onClose={() => setDatePickerTarget(null)}
+          onSelect={(dateKey) => {
+            setLocalEndKey(dateKey);
+            if (!isCreate) {
+              onUpdateDuration({ endDateKey: dateKey });
+            }
+          }}
+        />
+      </View>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1 },
   overlay: { flex: 1, justifyContent: 'flex-end' },
   card: {
     maxHeight: '92%',

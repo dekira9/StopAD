@@ -243,10 +243,9 @@ export function SleepNightObservationOverlay({ labels, onClose, onFinish }: Prop
   const asleepGlow = pressedZone === 'asleep' || activeZone === 'asleep';
   const awakeGlow = pressedZone === 'awake' || activeZone === 'awake';
   const bottomInset = Math.max(insets.bottom, 12);
-  const windowSize = Dimensions.get('window');
 
   return (
-    <View style={[styles.overlay, { width: windowSize.width, height: windowSize.height }]}>
+    <View style={styles.overlay}>
       <ExpoStatusBar style="light" />
       {Platform.OS === 'android' ? (
         <RNStatusBar backgroundColor={ASLEEP_BG} barStyle="light-content" />
@@ -286,7 +285,7 @@ export function SleepNightObservationOverlay({ labels, onClose, onFinish }: Prop
             </View>
           </Pressable>
 
-          <NightClockStrip label={clockLabel} width={windowSize.width} />
+          <NightClockStrip label={clockLabel} width={screen.width} />
         </View>
 
         <View style={[styles.finishBar, { paddingBottom: bottomInset }]}>

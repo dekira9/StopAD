@@ -1630,10 +1630,6 @@ function HomeScreen() {
               language={language}
               labels={t}
               onLanguageChange={handleLanguageChange}
-              onLearnMore={() => {
-                setReturnToSettingsAfterImportantInfo(false);
-                setShowImportantInfo(true);
-              }}
               onComplete={handleOnboardingComplete}
             />
 
@@ -1788,6 +1784,8 @@ function HomeScreen() {
               <AllMedicationsModal
                 visible
                 labels={t}
+                locale={locale}
+                weekdayLabels={weekDays.map((dayItem) => format(dayItem, 'EEE', { locale }).toUpperCase())}
                 initialStockCatalogId={pendingStockSetupCatalogId}
                 onInitialStockHandled={() => setPendingStockSetupCatalogId(null)}
                 onClose={() => {

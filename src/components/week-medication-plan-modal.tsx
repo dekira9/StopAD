@@ -9,6 +9,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MedicationRepeatModal } from '@/components/medication-repeat-modal';
 import type { AppLabels } from '@/constants/i18n';
@@ -18,6 +19,8 @@ import {
   type MedicationPlanTemplate,
   type MedicationRepeatConfig,
 } from '@/stores/wellness-store';
+
+const CARD_PADDING_BOTTOM = 18;
 
 const WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0] as const;
 
@@ -98,6 +101,7 @@ export function WeekMedicationPlanModal({
   onClose,
   onSave,
 }: Props) {
+  const insets = useSafeAreaInsets();
   const [templates, setTemplateRows] = useState(() => cloneTemplates(initialTemplates));
   const [repeatTargetId, setRepeatTargetId] = useState<string | null>(null);
 
@@ -156,7 +160,15 @@ export function WeekMedicationPlanModal({
     <>
       <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
         <View style={[styles.overlay, { backgroundColor: theme.modalOverlay }]}>
-          <View style={[styles.card, { backgroundColor: theme.modalBg, borderColor: theme.subtlePanelBorder }]}>
+          <View
+            style={[
+              styles.card,
+              {
+                backgroundColor: theme.modalBg,
+                borderColor: theme.subtlePanelBorder,
+                paddingBottom: CARD_PADDING_BOTTOM + insets.bottom,
+              },
+            ]}>
             <View style={styles.headerRow}>
               <View style={styles.headerTextWrap}>
                 <Text style={[styles.title, { color: theme.textSecondary }]}>{labels.weekMedicationPlan}</Text>
@@ -265,7 +277,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingHorizontal: 18,
     paddingTop: 16,
-    paddingBottom: 18,
+    paddingBottom: CARD_PADDING_BOTTOM,
   },
   headerRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 },
   headerTextWrap: { flex: 1 },

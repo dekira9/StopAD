@@ -3,6 +3,7 @@ import { format, parse } from 'date-fns';
 import { Image } from 'expo-image';
 import { useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { AppLabels } from '@/constants/i18n';
 import { LANGUAGES } from '@/constants/i18n';
@@ -62,6 +63,7 @@ function MedicationStockEditModalContent({
   onSave,
 }: ContentProps) {
   const { modal: theme, chrome: ui } = useAppChromeTheme();
+  const insets = useSafeAreaInsets();
   const language = wellnessStore.preferredLanguage ?? 'en';
   const locale = LANGUAGES[language].locale;
   const [remaining, setRemaining] = useState(
@@ -282,7 +284,8 @@ function MedicationStockEditModalContent({
             <View style={[styles.footerUpShadowBand, { top: -4, opacity: ui.panelEdgeShadow * 0.9 }]} />
             <View style={[styles.footerUpShadowBand, { top: -6, opacity: ui.panelEdgeShadow * 0.55 }]} />
           </View>
-          <View style={[styles.footer, { shadowOpacity: ui.panelEdgeShadow }]}>
+          <View
+            style={[styles.footer, { shadowOpacity: ui.panelEdgeShadow, paddingBottom: insets.bottom }]}>
           <Pressable
             onPress={() => {
               if (!canSave) return;

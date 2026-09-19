@@ -1,8 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { AppLabels } from '@/constants/i18n';
 import { useAppChromeTheme } from '@/hooks/use-app-chrome-theme';
+
+const CARD_PADDING_BOTTOM = 20;
 
 type Props = {
   visible: boolean;
@@ -14,10 +17,19 @@ const STEPS = ['panicAttackStep1', 'panicAttackStep2', 'panicAttackStep3', 'pani
 
 export function PanicAttackModal({ visible, labels, onClose }: Props) {
   const { modal: theme } = useAppChromeTheme();
+  const insets = useSafeAreaInsets();
   return (
     <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
       <View style={[styles.overlay, { backgroundColor: theme.modalOverlay }]}>
-        <View style={[styles.card, { backgroundColor: theme.modalBg, borderColor: theme.subtlePanelBorder }]}>
+        <View
+          style={[
+            styles.card,
+            {
+              backgroundColor: theme.modalBg,
+              borderColor: theme.subtlePanelBorder,
+              paddingBottom: CARD_PADDING_BOTTOM + insets.bottom,
+            },
+          ]}>
           <View style={styles.headerRow}>
             <View style={styles.headerBtn} />
             <Text style={[styles.title, { color: theme.text }]}>{labels.panicAttackButton}</Text>
@@ -68,7 +80,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingHorizontal: 20,
     paddingTop: 16,
-    paddingBottom: 20,
+    paddingBottom: CARD_PADDING_BOTTOM,
   },
   headerRow: {
     flexDirection: 'row',

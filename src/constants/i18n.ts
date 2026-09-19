@@ -24,6 +24,8 @@ export type AppLabels = {
   allMedicationsEmpty: string;
   allMedicationsCurrent: string;
   allMedicationsCompleted: string;
+  allMedicationsPeriod: string;
+  allMedicationsCompletedEmpty: string;
   repeatMedication: string;
   repeatMedicationHint: string;
   repeatDuration: string;
@@ -172,7 +174,6 @@ export type AppLabels = {
   medicationScheduleDuration: string;
   medicationScheduleStart: string;
   medicationScheduleEnd: string;
-  medicationScheduleNoEnd: string;
   medicationScheduleDelete: string;
   medicationScheduleDeleteConfirmTitle: string;
   medicationScheduleDeleteConfirmMessage: string;
@@ -303,6 +304,8 @@ export const LANGUAGES: Record<
       allMedicationsEmpty: 'No medications yet',
       allMedicationsCurrent: 'Current',
       allMedicationsCompleted: 'Completed',
+      allMedicationsPeriod: 'Period',
+      allMedicationsCompletedEmpty: 'No completed medications',
       repeatMedication: 'Repeat entry',
       repeatMedicationHint: 'Copy this medication to matching days ahead.',
       repeatDuration: 'Duration',
@@ -451,7 +454,6 @@ export const LANGUAGES: Record<
       medicationScheduleDuration: 'Duration',
       medicationScheduleStart: 'Start',
       medicationScheduleEnd: 'End',
-      medicationScheduleNoEnd: 'None',
       medicationScheduleDelete: 'Delete schedule',
       medicationScheduleDeleteConfirmTitle: 'Delete schedule?',
       medicationScheduleDeleteConfirmMessage:
@@ -589,6 +591,8 @@ export const LANGUAGES: Record<
       allMedicationsEmpty: 'Лекарств пока нет',
       allMedicationsCurrent: 'Текущие',
       allMedicationsCompleted: 'Завершенные',
+      allMedicationsPeriod: 'Период',
+      allMedicationsCompletedEmpty: 'Нет завершённых лекарств',
       repeatMedication: 'Повтор записи',
       repeatMedicationHint: 'Скопировать это лекарство на выбранные дни вперёд.',
       repeatDuration: 'Срок',
@@ -737,7 +741,6 @@ export const LANGUAGES: Record<
       medicationScheduleDuration: 'Длительность',
       medicationScheduleStart: 'Начало',
       medicationScheduleEnd: 'Окончание',
-      medicationScheduleNoEnd: 'Нет',
       medicationScheduleDelete: 'Удалить график',
       medicationScheduleDeleteConfirmTitle: 'Удалить график?',
       medicationScheduleDeleteConfirmMessage:
@@ -875,6 +878,8 @@ export const LANGUAGES: Record<
       allMedicationsEmpty: 'Aún no hay medicamentos',
       allMedicationsCurrent: 'Actuales',
       allMedicationsCompleted: 'Finalizados',
+      allMedicationsPeriod: 'Periodo',
+      allMedicationsCompletedEmpty: 'No hay medicamentos finalizados',
       repeatMedication: 'Repetir entrada',
       repeatMedicationHint: 'Copiar este medicamento a los días seleccionados.',
       repeatDuration: 'Duración',
@@ -1023,7 +1028,6 @@ export const LANGUAGES: Record<
       medicationScheduleDuration: 'Duración',
       medicationScheduleStart: 'Inicio',
       medicationScheduleEnd: 'Fin',
-      medicationScheduleNoEnd: 'Ninguno',
       medicationScheduleDelete: 'Eliminar horario',
       medicationScheduleDeleteConfirmTitle: '¿Eliminar horario?',
       medicationScheduleDeleteConfirmMessage:
@@ -1161,6 +1165,8 @@ export const LANGUAGES: Record<
       allMedicationsEmpty: 'Aucun médicament',
       allMedicationsCurrent: 'En cours',
       allMedicationsCompleted: 'Terminés',
+      allMedicationsPeriod: 'Période',
+      allMedicationsCompletedEmpty: 'Aucun médicament terminé',
       repeatMedication: 'Répéter',
       repeatMedicationHint: 'Copier ce médicament sur les jours choisis.',
       repeatDuration: 'Durée',
@@ -1309,7 +1315,6 @@ export const LANGUAGES: Record<
       medicationScheduleDuration: 'Durée',
       medicationScheduleStart: 'Début',
       medicationScheduleEnd: 'Fin',
-      medicationScheduleNoEnd: 'Aucune',
       medicationScheduleDelete: 'Supprimer l’horaire',
       medicationScheduleDeleteConfirmTitle: 'Supprimer l’horaire ?',
       medicationScheduleDeleteConfirmMessage:
@@ -1447,6 +1452,8 @@ export const LANGUAGES: Record<
       allMedicationsEmpty: 'Noch keine Medikamente',
       allMedicationsCurrent: 'Aktuell',
       allMedicationsCompleted: 'Abgeschlossen',
+      allMedicationsPeriod: 'Zeitraum',
+      allMedicationsCompletedEmpty: 'Keine abgeschlossenen Medikamente',
       repeatMedication: 'Eintrag wiederholen',
       repeatMedicationHint: 'Dieses Medikament auf gewählte Tage kopieren.',
       repeatDuration: 'Zeitraum',
@@ -1595,7 +1602,6 @@ export const LANGUAGES: Record<
       medicationScheduleDuration: 'Dauer',
       medicationScheduleStart: 'Beginn',
       medicationScheduleEnd: 'Ende',
-      medicationScheduleNoEnd: 'Kein',
       medicationScheduleDelete: 'Plan löschen',
       medicationScheduleDeleteConfirmTitle: 'Plan löschen?',
       medicationScheduleDeleteConfirmMessage:
@@ -1733,6 +1739,8 @@ export const LANGUAGES: Record<
       allMedicationsEmpty: '暂无药物',
       allMedicationsCurrent: '当前',
       allMedicationsCompleted: '已完成',
+      allMedicationsPeriod: '周期',
+      allMedicationsCompletedEmpty: '暂无已完成的药物',
       repeatMedication: '重复记录',
       repeatMedicationHint: '将此药物复制到所选日期。',
       repeatDuration: '期限',
@@ -1881,7 +1889,6 @@ export const LANGUAGES: Record<
       medicationScheduleDuration: '持续时间',
       medicationScheduleStart: '开始',
       medicationScheduleEnd: '结束',
-      medicationScheduleNoEnd: '无',
       medicationScheduleDelete: '删除计划',
       medicationScheduleDeleteConfirmTitle: '删除计划？',
       medicationScheduleDeleteConfirmMessage: '服药计划将被删除。此操作无法撤销。',
@@ -2016,6 +2023,8 @@ export const LANGUAGES: Record<
       allMedicationsEmpty: 'Nenhum medicamento ainda',
       allMedicationsCurrent: 'Atuais',
       allMedicationsCompleted: 'Concluídos',
+      allMedicationsPeriod: 'Período',
+      allMedicationsCompletedEmpty: 'Nenhum medicamento concluído',
       repeatMedication: 'Repetir entrada',
       repeatMedicationHint: 'Copiar este medicamento para os dias escolhidos.',
       repeatDuration: 'Duração',
@@ -2164,7 +2173,6 @@ export const LANGUAGES: Record<
       medicationScheduleDuration: 'Duração',
       medicationScheduleStart: 'Início',
       medicationScheduleEnd: 'Fim',
-      medicationScheduleNoEnd: 'Nenhum',
       medicationScheduleDelete: 'Excluir horário',
       medicationScheduleDeleteConfirmTitle: 'Excluir horário?',
       medicationScheduleDeleteConfirmMessage:
@@ -2302,6 +2310,8 @@ export const LANGUAGES: Record<
       allMedicationsEmpty: 'Nessun farmaco',
       allMedicationsCurrent: 'Attuali',
       allMedicationsCompleted: 'Completati',
+      allMedicationsPeriod: 'Periodo',
+      allMedicationsCompletedEmpty: 'Nessun farmaco completato',
       repeatMedication: 'Ripeti voce',
       repeatMedicationHint: 'Copia questo farmaco sui giorni scelti.',
       repeatDuration: 'Durata',
@@ -2450,7 +2460,6 @@ export const LANGUAGES: Record<
       medicationScheduleDuration: 'Durata',
       medicationScheduleStart: 'Inizio',
       medicationScheduleEnd: 'Fine',
-      medicationScheduleNoEnd: 'Nessuna',
       medicationScheduleDelete: 'Elimina orario',
       medicationScheduleDeleteConfirmTitle: 'Eliminare l’orario?',
       medicationScheduleDeleteConfirmMessage:
@@ -2588,6 +2597,8 @@ export const LANGUAGES: Record<
       allMedicationsEmpty: '薬はまだありません',
       allMedicationsCurrent: '現在',
       allMedicationsCompleted: '完了',
+      allMedicationsPeriod: '期間',
+      allMedicationsCompletedEmpty: '完了した薬はありません',
       repeatMedication: '記録を繰り返す',
       repeatMedicationHint: 'この薬を選択した日にコピーします。',
       repeatDuration: '期間',
@@ -2736,7 +2747,6 @@ export const LANGUAGES: Record<
       medicationScheduleDuration: '期間',
       medicationScheduleStart: '開始',
       medicationScheduleEnd: '終了',
-      medicationScheduleNoEnd: 'なし',
       medicationScheduleDelete: 'スケジュールを削除',
       medicationScheduleDeleteConfirmTitle: 'スケジュールを削除しますか？',
       medicationScheduleDeleteConfirmMessage:
@@ -2874,6 +2884,8 @@ export const LANGUAGES: Record<
       allMedicationsEmpty: '아직 등록된 약이 없습니다',
       allMedicationsCurrent: '현재',
       allMedicationsCompleted: '완료됨',
+      allMedicationsPeriod: '기간',
+      allMedicationsCompletedEmpty: '완료된 약이 없습니다',
       repeatMedication: '기록 반복',
       repeatMedicationHint: '이 약을 선택한 날짜에 복사합니다.',
       repeatDuration: '기간',
@@ -3022,7 +3034,6 @@ export const LANGUAGES: Record<
       medicationScheduleDuration: '기간',
       medicationScheduleStart: '시작',
       medicationScheduleEnd: '종료',
-      medicationScheduleNoEnd: '없음',
       medicationScheduleDelete: '일정 삭제',
       medicationScheduleDeleteConfirmTitle: '일정을 삭제할까요?',
       medicationScheduleDeleteConfirmMessage:

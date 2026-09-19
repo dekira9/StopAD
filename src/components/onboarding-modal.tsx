@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { LANGUAGES, type AppLabels, type Language } from '@/constants/i18n';
 import { useAppChromeTheme } from '@/hooks/use-app-chrome-theme';
+import { ImportantInfoModal } from '@/components/important-info-modal';
 
 export type OnboardingResult = {
   language: Language;
@@ -23,7 +24,6 @@ type Props = {
   language: Language;
   labels: AppLabels;
   onLanguageChange: (language: Language) => void;
-  onLearnMore: () => void;
   onComplete: (result: OnboardingResult) => void;
 };
 
@@ -149,12 +149,12 @@ export function OnboardingModal({
   language,
   labels,
   onLanguageChange,
-  onLearnMore,
   onComplete,
 }: Props) {
   const insets = useSafeAreaInsets();
   const { modal: theme } = useAppChromeTheme();
   const [step, setStep] = useState(0);
+  const [showLearnMore, setShowLearnMore] = useState(false);
 
   const finish = () => {
     onComplete({ language });
@@ -315,7 +315,9 @@ export function OnboardingModal({
           </Text>
 
           {step === 3 ? (
-            <Pressable onPress={onLearnMore} style={({ pressed }) => [styles.learnMoreBtn, pressed && styles.pressed]}>
+            <Pressable
+              onPress={() => setShowLearnMore(true)}
+              style={({ pressed }) => [styles.learnMoreBtn, pressed && styles.pressed]}>
               <Text style={[styles.learnMoreText, { color: theme.activeBg }]}>{labels.onboardingLearnMore}</Text>
               <Ionicons name="chevron-forward" size={14} color={theme.activeBg} />
             </Pressable>
@@ -371,6 +373,14 @@ export function OnboardingModal({
             </Pressable>
           )}
         </View>
+
+        <ImportantInfoModal
+          embedded
+          visible={showLearnMore}
+          language={language}
+          labels={labels}
+          onClose={() => setShowLearnMore(false)}
+        />
       </View>
     </Modal>
   );

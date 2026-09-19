@@ -31,7 +31,7 @@ export type MedicationRepeatConfig = {
   intervalDays?: number;
   intervalMonths?: number;
   startDateKey?: string;
-  endDateKey?: string | null;
+  endDateKey?: string;
 };
 
 export type MedicationPlanTemplate = {
@@ -154,7 +154,7 @@ const WEEK_STARTS_ON = 1 as const;
 function scoreMedicationRepeat(repeat: MedicationRepeatConfig): number {
   let score = 0;
   if (repeat.startDateKey) score += 10;
-  if (repeat.endDateKey !== undefined) score += 5;
+  if (repeat.endDateKey) score += 5;
   return score;
 }
 
@@ -203,7 +203,7 @@ function normalizeMedicationRepeat(repeat?: Partial<MedicationRepeatConfig>): Me
   return {
     ...normalized,
     startDateKey: repeat?.startDateKey ?? merged.startDateKey,
-    endDateKey: repeat?.endDateKey !== undefined ? repeat.endDateKey : merged.endDateKey,
+    endDateKey: repeat?.endDateKey ?? merged.endDateKey,
   };
 }
 
@@ -214,9 +214,6 @@ function getMedicationDurationStart(repeat: MedicationRepeatConfig, weekStartKey
 
 function getMedicationDurationEnd(repeat: MedicationRepeatConfig, weekStartKey: string): Date {
   const start = getMedicationDurationStart(repeat, weekStartKey);
-  if (repeat.endDateKey === null) {
-    return addMonths(start, 24);
-  }
   if (repeat.endDateKey) {
     return parse(repeat.endDateKey, 'yyyy-MM-dd', new Date());
   }
@@ -1613,7 +1610,7 @@ class WellnessStore {
   setMedicationDuration(
     weekStartKey: string,
     row: Pick<MedicationRow, 'medication' | 'time'>,
-    updates: { startDateKey?: string; endDateKey?: string | null },
+    updates: { startDateKey?: string; endDateKey?: string },
   ) {
     const schedule = this.getMedicationScheduleForName(row.medication.trim(), weekStartKey);
     const current = normalizeMedicationRepeat(schedule.repeat);
@@ -1623,19 +1620,14 @@ class WellnessStore {
       nextRepeat.startDateKey = updates.startDateKey;
     }
 
-    if ('endDateKey' in updates) {
+    if (updates.endDateKey) {
       if (!nextRepeat.startDateKey) {
         nextRepeat.startDateKey = current.startDateKey ?? weekStartKey;
       }
-      if (updates.endDateKey === null) {
-        nextRepeat.endDateKey = null;
-      } else if (updates.endDateKey) {
-        nextRepeat.endDateKey = updates.endDateKey;
-        const startKey = nextRepeat.startDateKey ?? weekStartKey;
-        const start = parse(startKey, 'yyyy-MM-dd', new Date());
-        const end = parse(updates.endDateKey, 'yyyy-MM-dd', new Date());
-        nextRepeat.months = Math.max(1, differenceInCalendarMonths(end, start) || 1);
-      }
+      nextRepeat.endDateKey = updates.endDateKey;
+      const start = parse(nextRepeat.startDateKey, 'yyyy-MM-dd', new Date());
+      const end = parse(updates.endDateKey, 'yyyy-MM-dd', new Date());
+      nextRepeat.months = Math.max(1, differenceInCalendarMonths(end, start) || 1);
     }
 
     this.updateMedicationRepeat(weekStartKey, row, normalizeMedicationRepeat(nextRepeat));

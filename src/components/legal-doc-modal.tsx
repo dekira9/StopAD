@@ -1,8 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { AppLabels } from '@/constants/i18n';
 import { useAppChromeTheme } from '@/hooks/use-app-chrome-theme';
+
+const CARD_PADDING_BOTTOM = 24;
 
 type Props = {
   visible: boolean;
@@ -14,13 +17,22 @@ type Props = {
 
 export function LegalDocModal({ visible, title, body, labels, onClose }: Props) {
   const { modal: theme } = useAppChromeTheme();
+  const insets = useSafeAreaInsets();
   const paragraphs = body.split('\n\n').filter(Boolean);
   const [heading, ...rest] = paragraphs;
 
   return (
     <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
       <View style={[styles.overlay, { backgroundColor: theme.modalOverlay }]}>
-        <View style={[styles.card, { backgroundColor: theme.modalBg, borderColor: theme.subtlePanelBorder }]}>
+        <View
+          style={[
+            styles.card,
+            {
+              backgroundColor: theme.modalBg,
+              borderColor: theme.subtlePanelBorder,
+              paddingBottom: CARD_PADDING_BOTTOM + insets.bottom,
+            },
+          ]}>
           <View style={styles.headerRow}>
             <View style={styles.headerBtn} />
             <Text style={[styles.title, { color: theme.text }]}>{title}</Text>
@@ -69,7 +81,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
     borderWidth: 1,
     paddingTop: 12,
-    paddingBottom: 24,
+    paddingBottom: CARD_PADDING_BOTTOM,
   },
   headerRow: {
     flexDirection: 'row',

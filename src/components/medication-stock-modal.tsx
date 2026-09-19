@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MedicineBottleIcon, PillIcon } from '@/components/medical-ui-icons';
 import type { AppLabels } from '@/constants/i18n';
@@ -15,6 +16,7 @@ import {
 import { useAppChromeTheme } from '@/hooks/use-app-chrome-theme';
 
 const RESERVE_MED_SIZE = 120;
+const CARD_PADDING_BOTTOM = 24;
 
 type Props = {
   visible: boolean;
@@ -59,11 +61,20 @@ function MedicationStockModalContent({
   onOpenRefillReminder,
 }: ContentProps) {
   const { modal: theme, chrome } = useAppChromeTheme();
+  const insets = useSafeAreaInsets();
   const medName = name.trim() || labels.medicationName;
   const doseLabel = dose.trim();
 
   return (
-    <View style={[styles.card, { backgroundColor: theme.modalBg, borderColor: theme.subtlePanelBorder }]}>
+    <View
+      style={[
+        styles.card,
+        {
+          backgroundColor: theme.modalBg,
+          borderColor: theme.subtlePanelBorder,
+          paddingBottom: CARD_PADDING_BOTTOM + insets.bottom,
+        },
+      ]}>
       <View style={styles.handleWrap}>
         <View style={[styles.handle, { backgroundColor: theme.subtlePanelBorder }]} />
       </View>
@@ -181,7 +192,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
     borderWidth: 1,
     paddingTop: 4,
-    paddingBottom: 24,
+    paddingBottom: CARD_PADDING_BOTTOM,
     overflow: 'hidden',
   },
   handleWrap: {

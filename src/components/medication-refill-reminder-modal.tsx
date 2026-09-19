@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { AppLabels } from '@/constants/i18n';
 import { Fonts } from '@/constants/theme';
@@ -51,6 +52,7 @@ function MedicationRefillReminderModalContent({
   onSave,
 }: ContentProps) {
   const { modal: theme, chrome } = useAppChromeTheme();
+  const insets = useSafeAreaInsets();
   const [enabled, setEnabled] = useState(initialEnabled);
   const [count, setCount] = useState(initialCount !== undefined ? String(initialCount) : '');
 
@@ -165,7 +167,15 @@ function MedicationRefillReminderModalContent({
           </View>
         </View>
 
-        <View style={[styles.footer, { borderTopColor: theme.subtlePanelBorder, backgroundColor: theme.modalBg }]}>
+        <View
+          style={[
+            styles.footer,
+            {
+              borderTopColor: theme.subtlePanelBorder,
+              backgroundColor: theme.modalBg,
+              paddingBottom: insets.bottom,
+            },
+          ]}>
           <Pressable
             onPress={() =>
               onSave({

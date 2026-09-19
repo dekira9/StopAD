@@ -1,8 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
-import { addMonths, format, parse } from 'date-fns';
+import { format } from 'date-fns';
+import type { Locale } from 'date-fns';
 import { BlurTargetView, BlurView } from 'expo-blur';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MedicineBottleIcon, ScheduleIcon } from '@/components/medical-ui-icons';
 import { MedicationRefillReminderModal } from '@/components/medication-refill-reminder-modal';
@@ -17,6 +19,11 @@ import {
   type MedicationCatalogEntry,
   wellnessStore,
 } from '@/stores/wellness-store';
+import {
+  formatCatalogMedicationPeriod,
+  formatCatalogMedicationScheduleDetail,
+  resolveMedicationEndDateKey,
+} from '@/utils/medication-catalog-summary';
 
 const HEADER_TITLE_BLOCK = 40;
 const HEADER_TABS_EXTRA = 62;
@@ -32,6 +39,8 @@ type AllMedicationsLabels = AppLabels & {
 type Props = {
   visible: boolean;
   labels: AllMedicationsLabels;
+  locale: Locale;
+  weekdayLabels: string[];
   onClose: () => void;
   onAddMedication: () => void;
   onOpenSchedule: (entry: MedicationCatalogEntry) => void;
@@ -49,6 +58,8 @@ type ShellProps = Omit<Props, 'visible'>;
 
 function AllMedicationsModalShell({
   labels,
+  locale,
+  weekdayLabels,
   onClose,
   onAddMedication,
   onOpenSchedule,
@@ -56,6 +67,7 @@ function AllMedicationsModalShell({
   onInitialStockHandled,
 }: ShellProps) {
   const { modal: theme, chrome: ui, isDark } = useAppChromeTheme();
+  const insets = useSafeAreaInsets();
   const blurTargetRef = useRef<View | null>(null);
   const [initialState] = useState(() => {
     const initialEntries = loadVisibleMedicationEntries();
@@ -97,17 +109,7 @@ function AllMedicationsModalShell({
     for (const entry of entries) {
       const label = catalogEntryMedicationLabel(entry);
       const schedule = wellnessStore.getMedicationScheduleForName(label);
-      const repeat = schedule.repeat;
-      let endKey: string | null = null;
-
-      if (repeat.endDateKey === null) {
-        endKey = null;
-      } else if (repeat.endDateKey) {
-        endKey = repeat.endDateKey;
-      } else if (repeat.startDateKey) {
-        const start = parse(repeat.startDateKey, 'yyyy-MM-dd', new Date());
-        endKey = format(addMonths(start, repeat.months), 'yyyy-MM-dd');
-      }
+      const endKey = resolveMedicationEndDateKey(schedule.repeat);
 
       if (endKey && endKey < todayKey) {
         completed.push(entry);
@@ -169,11 +171,18 @@ function AllMedicationsModalShell({
     </View>
   );
 
-  const renderEntry = (entry: MedicationCatalogEntry) => {
+  const renderEntry = (entry: MedicationCatalogEntry, isCompleted: boolean) => {
     const label = catalogEntryMedicationLabel(entry);
     const schedule = wellnessStore.getMedicationScheduleForName(label);
     const hasSchedule = label.trim().length > 0 && (schedule.times.length > 0 || Boolean(schedule.repeat.startDateKey));
-    const canRemoveDraft = entry.isDraft && !entry.name.trim() && !entry.dose.trim() && !hasSchedule;
+    const canRemoveDraft = !isCompleted && entry.isDraft && !entry.name.trim() && !entry.dose.trim() && !hasSchedule;
+    const periodText = formatCatalogMedicationPeriod(schedule.repeat, locale, labels);
+    const scheduleDetail = formatCatalogMedicationScheduleDetail(
+      schedule.repeat,
+      schedule.times,
+      labels,
+      weekdayLabels,
+    );
 
     return (
       <View
@@ -188,20 +197,35 @@ function AllMedicationsModalShell({
         ]}>
         <View style={styles.rowHeader}>
           <View style={styles.fields}>
-            <TextInput
-              value={entry.name}
-              onChangeText={(value) => handleUpdate(entry.id, { name: value })}
-              placeholder={labels.medicationName}
-              placeholderTextColor={theme.textSecondary}
-              style={[styles.nameInput, { color: theme.text }]}
-            />
-            <TextInput
-              value={entry.dose}
-              onChangeText={(value) => handleUpdate(entry.id, { dose: value })}
-              placeholder={labels.medicationDose}
-              placeholderTextColor={theme.textSecondary}
-              style={[styles.doseInput, { color: theme.text }]}
-            />
+            {isCompleted ? (
+              <>
+                <Text style={[styles.nameInput, { color: theme.text }]} numberOfLines={2}>
+                  {entry.name.trim() || labels.medicationName}
+                </Text>
+                {entry.dose.trim() ? (
+                  <Text style={[styles.doseInput, { color: theme.textSecondary }]} numberOfLines={1}>
+                    {entry.dose.trim()}
+                  </Text>
+                ) : null}
+              </>
+            ) : (
+              <>
+                <TextInput
+                  value={entry.name}
+                  onChangeText={(value) => handleUpdate(entry.id, { name: value })}
+                  placeholder={labels.medicationName}
+                  placeholderTextColor={theme.textSecondary}
+                  style={[styles.nameInput, { color: theme.text }]}
+                />
+                <TextInput
+                  value={entry.dose}
+                  onChangeText={(value) => handleUpdate(entry.id, { dose: value })}
+                  placeholder={labels.medicationDose}
+                  placeholderTextColor={theme.textSecondary}
+                  style={[styles.doseInput, { color: theme.text }]}
+                />
+              </>
+            )}
           </View>
           {canRemoveDraft ? (
             <Pressable
@@ -215,34 +239,57 @@ function AllMedicationsModalShell({
             <View style={styles.deleteBtn} />
           )}
         </View>
-        <View style={styles.actionRow}>
-          <Pressable
-            onPress={() => onOpenSchedule(entry)}
-            style={({ pressed }) => [
-              styles.actionBtn,
-              { borderColor: theme.inactiveBorder, backgroundColor: '#F8F9FC' },
-              pressed && styles.pressed,
-            ]}>
-            <ScheduleIcon size={22} color={theme.text} />
-            <Text style={[styles.actionBtnText, { color: theme.inactiveText }]}>
-              {formatSectionTitle(labels.medicationScheduleButton)}
+        {isCompleted ? (
+          <View style={[styles.completedMeta, { borderColor: theme.inactiveBorder }]}>
+            <Text style={[styles.completedMetaLabel, { color: theme.textSecondary }]}>
+              {formatSectionTitle(labels.allMedicationsPeriod)}
             </Text>
-            <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />
-          </Pressable>
-          <Pressable
-            onPress={() => setStockTarget(entry)}
-            style={({ pressed }) => [
-              styles.actionBtn,
-              { borderColor: theme.inactiveBorder, backgroundColor: '#F8F9FC' },
-              pressed && styles.pressed,
-            ]}>
-            <MedicineBottleIcon size={22} color={theme.text} />
-            <Text style={[styles.actionBtnText, { color: theme.inactiveText }]}>
-              {formatSectionTitle(labels.medicationStockAndRefillButton)}
-            </Text>
-            <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />
-          </Pressable>
-        </View>
+            <Text style={[styles.completedMetaPeriod, { color: theme.text }]}>{periodText}</Text>
+            <Text style={[styles.completedMetaDetail, { color: theme.textSecondary }]}>{scheduleDetail}</Text>
+            <Pressable
+              onPress={() => onOpenSchedule(entry)}
+              style={({ pressed }) => [
+                styles.actionBtn,
+                { borderColor: theme.inactiveBorder, backgroundColor: '#F8F9FC' },
+                pressed && styles.pressed,
+              ]}>
+              <Ionicons name="refresh-outline" size={20} color={theme.text} />
+              <Text style={[styles.actionBtnText, { color: theme.inactiveText }]}>
+                {formatSectionTitle(labels.repeatMedication)}
+              </Text>
+              <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />
+            </Pressable>
+          </View>
+        ) : (
+          <View style={styles.actionRow}>
+            <Pressable
+              onPress={() => onOpenSchedule(entry)}
+              style={({ pressed }) => [
+                styles.actionBtn,
+                { borderColor: theme.inactiveBorder, backgroundColor: '#F8F9FC' },
+                pressed && styles.pressed,
+              ]}>
+              <ScheduleIcon size={22} color={theme.text} />
+              <Text style={[styles.actionBtnText, { color: theme.inactiveText }]}>
+                {formatSectionTitle(labels.medicationScheduleButton)}
+              </Text>
+              <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />
+            </Pressable>
+            <Pressable
+              onPress={() => setStockTarget(entry)}
+              style={({ pressed }) => [
+                styles.actionBtn,
+                { borderColor: theme.inactiveBorder, backgroundColor: '#F8F9FC' },
+                pressed && styles.pressed,
+              ]}>
+              <MedicineBottleIcon size={22} color={theme.text} />
+              <Text style={[styles.actionBtnText, { color: theme.inactiveText }]}>
+                {formatSectionTitle(labels.medicationStockAndRefillButton)}
+              </Text>
+              <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />
+            </Pressable>
+          </View>
+        )}
       </View>
     );
   };
@@ -284,10 +331,12 @@ function AllMedicationsModalShell({
                     </Text>
                   ) : visibleEntries.length === 0 ? (
                     <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-                      {labels.allMedicationsEmpty}
+                      {listTab === 'completed' ? labels.allMedicationsCompletedEmpty : labels.allMedicationsEmpty}
                     </Text>
                   ) : (
-                    <View style={styles.section}>{visibleEntries.map(renderEntry)}</View>
+                    <View style={styles.section}>
+                      {visibleEntries.map((entry) => renderEntry(entry, listTab === 'completed'))}
+                    </View>
                   )}
                 </ScrollView>
               </BlurTargetView>
@@ -339,7 +388,8 @@ function AllMedicationsModalShell({
                   <View style={[styles.footerUpShadowBand, { top: -4, opacity: ui.panelEdgeShadow * 0.9 }]} />
                   <View style={[styles.footerUpShadowBand, { top: -6, opacity: ui.panelEdgeShadow * 0.55 }]} />
                 </View>
-                <View style={[styles.footer, { shadowOpacity: ui.panelEdgeShadow }]}>
+                <View
+                  style={[styles.footer, { shadowOpacity: ui.panelEdgeShadow, paddingBottom: insets.bottom }]}>
                 <Pressable
                   onPress={onAddMedication}
                   style={({ pressed }) => [
@@ -439,6 +489,8 @@ function AllMedicationsModalShell({
 export function AllMedicationsModal({
   visible,
   labels,
+  locale,
+  weekdayLabels,
   onClose,
   onAddMedication,
   onOpenSchedule,
@@ -450,6 +502,8 @@ export function AllMedicationsModal({
     <AllMedicationsModalShell
       key="all-medications-open"
       labels={labels}
+      locale={locale}
+      weekdayLabels={weekdayLabels}
       onClose={onClose}
       onAddMedication={onAddMedication}
       onOpenSchedule={onOpenSchedule}
@@ -602,6 +656,28 @@ const styles = StyleSheet.create({
   actionRow: {
     flexDirection: 'column',
     gap: 8,
+  },
+  completedMeta: {
+    gap: 6,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: 10,
+  },
+  completedMetaLabel: {
+    ...weekServiceTextStyle,
+    fontSize: 11,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    fontFamily: Fonts.sansSemiBold,
+    fontWeight: '600',
+  },
+  completedMetaPeriod: {
+    fontSize: 13,
+    fontWeight: '700',
+    fontFamily: Fonts.mono,
+  },
+  completedMetaDetail: {
+    fontSize: 12,
+    lineHeight: 17,
   },
   actionBtn: {
     flexDirection: 'row',

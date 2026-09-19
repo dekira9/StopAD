@@ -10,6 +10,8 @@ import { useAppChromeTheme } from '@/hooks/use-app-chrome-theme';
 
 type Props = {
   visible: boolean;
+  /** Render inside a parent Modal (required on iOS — stacked Modals do not receive touches). */
+  embedded?: boolean;
   title: string;
   labels: AppLabels;
   initialTime: string;
@@ -29,7 +31,7 @@ export function formatTimeValue(date: Date): string {
   return format(date, 'HH:mm');
 }
 
-type ContentProps = Omit<Props, 'visible'>;
+type ContentProps = Omit<Props, 'visible' | 'embedded'>;
 
 function MedicationTimePickerModalContent({
   title,
@@ -69,14 +71,17 @@ function MedicationTimePickerModalContent({
             </Pressable>
           </View>
 
-          <DateTimePicker
-            value={pickerValue}
-            mode="time"
-            display="spinner"
-            is24Hour
-            themeVariant={theme.modalBg === Colors.light.background || theme.modalBg === '#FFFFFF' ? 'light' : 'dark'}
-            onValueChange={(_, date) => setPickerValue(date)}
-          />
+          <View style={styles.pickerWrap}>
+            <DateTimePicker
+              value={pickerValue}
+              mode="time"
+              display="spinner"
+              is24Hour
+              themeVariant={theme.modalBg === Colors.light.background || theme.modalBg === '#FFFFFF' ? 'light' : 'dark'}
+              onValueChange={(_, date) => setPickerValue(date)}
+              style={styles.picker}
+            />
+          </View>
 
           <View style={styles.actions}>
             <Pressable
@@ -98,20 +103,47 @@ function MedicationTimePickerModalContent({
   );
 }
 
-export function MedicationTimePickerModal({ visible, ...contentProps }: Props) {
+export function MedicationTimePickerModal({ visible, embedded = false, ...contentProps }: Props) {
+  if (!visible) return null;
+
+  const content = (
+    <MedicationTimePickerModalContent key={contentProps.initialTime} {...contentProps} />
+  );
+
+  if (embedded) {
+    return <View style={styles.embeddedRoot}>{content}</View>;
+  }
+
   if (Platform.OS === 'android') {
-    return visible ? <MedicationTimePickerModalContent key={contentProps.initialTime} {...contentProps} /> : null;
+    return content;
   }
 
   return (
-    <Modal transparent visible={visible} animationType="fade" onRequestClose={contentProps.onClose}>
-      {visible ? <MedicationTimePickerModalContent key={contentProps.initialTime} {...contentProps} /> : null}
+    <Modal
+      transparent
+      visible
+      animationType="fade"
+      presentationStyle="overFullScreen"
+      statusBarTranslucent
+      onRequestClose={contentProps.onClose}>
+      {content}
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20 },
+  embeddedRoot: {
+    ...StyleSheet.absoluteFill,
+    zIndex: 20,
+    justifyContent: 'center',
+  },
+  overlay: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 40,
+  },
   card: {
     width: '100%',
     maxWidth: 360,
@@ -129,6 +161,17 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 11, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase', flex: 1 },
   closeBtn: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
+  pickerWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    height: 216,
+    overflow: 'hidden',
+  },
+  picker: {
+    width: '100%',
+    height: 216,
+  },
   actions: { flexDirection: 'row', gap: 10, marginTop: 8 },
   actionButton: {
     flex: 1,

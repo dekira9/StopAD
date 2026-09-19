@@ -1,5 +1,13 @@
 import { addDays, format, isWithinInterval, startOfDay } from 'date-fns';
 import type { Locale } from 'date-fns';
+import {
+  cacheDirectory,
+  copyAsync,
+  EncodingType,
+  getContentUriAsync,
+  getInfoAsync,
+  writeAsStringAsync,
+} from 'expo-file-system/legacy';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { Platform } from 'react-native';
@@ -216,15 +224,15 @@ export function buildWeeklySummaryHtml({
       .stack-item:last-child { margin-bottom: 0; }
       .stack-item.compact { font-size: 8px; line-height: 1.25; }
       .panic-bars {
-        display: inline-flex;
-        flex-direction: column-reverse;
-        gap: 1px;
+        display: inline-block;
+        vertical-align: middle;
         min-height: 24px;
-        justify-content: flex-start;
       }
       .panic-block {
+        display: block;
         width: 6px;
         height: 6px;
+        margin: 0 auto 1px;
         border-radius: 1px;
       }
       .panic-block.filled { background: #141414; }
@@ -321,6 +329,92 @@ export function buildWeeklySummaryHtml({
 </html>`;
 }
 
+const PDF_CACHE_NAME = 'hi-anxiety-week-summary.pdf';
+
+function isShareDismissedError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const message = error.message.toLowerCase();
+  return (
+    message.includes('cancel') ||
+    message.includes('dismiss') ||
+    message.includes('did not share') ||
+    message.includes('user denied')
+  );
+}
+
+async function createPdfFile(html: string): Promise<string> {
+  let result: Awaited<ReturnType<typeof Print.printToFileAsync>>;
+  try {
+    result = await Print.printToFileAsync({ html, base64: true });
+  } catch (error) {
+    console.warn('[weekly-summary-pdf] printToFileAsync(base64) failed, retrying', error);
+    result = await Print.printToFileAsync({ html });
+  }
+
+  if (!cacheDirectory) {
+    return result.uri;
+  }
+
+  const destUri = `${cacheDirectory}${PDF_CACHE_NAME}`;
+
+  if (result.base64) {
+    await writeAsStringAsync(destUri, result.base64, { encoding: EncodingType.Base64 });
+  } else {
+    await copyAsync({ from: result.uri, to: destUri });
+  }
+
+  const info = await getInfoAsync(destUri);
+  if (!info.exists) {
+    throw new Error('PDF file was not created');
+  }
+
+  return destUri;
+}
+
+async function sharePdfFile(fileUri: string, dialogTitle: string): Promise<void> {
+  if (!(await Sharing.isAvailableAsync())) {
+    await Print.printAsync({ uri: fileUri });
+    return;
+  }
+
+  const shareOptions = {
+    mimeType: 'application/pdf',
+    dialogTitle,
+    ...(Platform.OS === 'ios' ? { UTI: 'com.adobe.pdf' as const } : {}),
+  };
+
+  const urisToTry: string[] = [fileUri];
+
+  if (Platform.OS === 'android') {
+    try {
+      urisToTry.push(await getContentUriAsync(fileUri));
+    } catch (error) {
+      console.warn('[weekly-summary-pdf] getContentUriAsync failed', error);
+    }
+  }
+
+  let lastError: unknown;
+  for (const uri of urisToTry) {
+    try {
+      await Sharing.shareAsync(uri, shareOptions);
+      return;
+    } catch (error) {
+      if (isShareDismissedError(error)) return;
+      lastError = error;
+      console.warn('[weekly-summary-pdf] shareAsync failed', uri, error);
+    }
+  }
+
+  // Last resort: system print dialog (Android can save as PDF from here).
+  try {
+    await Print.printAsync({ uri: fileUri });
+    return;
+  } catch (error) {
+    console.warn('[weekly-summary-pdf] printAsync fallback failed', error);
+    throw lastError ?? error;
+  }
+}
+
 export async function exportWeeklySummaryPdf(options: ExportOptions): Promise<void> {
   const html = buildWeeklySummaryHtml(options);
 
@@ -329,16 +423,6 @@ export async function exportWeeklySummaryPdf(options: ExportOptions): Promise<vo
     return;
   }
 
-  const { uri } = await Print.printToFileAsync({ html });
-
-  if (await Sharing.isAvailableAsync()) {
-    await Sharing.shareAsync(uri, {
-      mimeType: 'application/pdf',
-      UTI: 'com.adobe.pdf',
-      dialogTitle: options.labels.weeklyExportPdf,
-    });
-    return;
-  }
-
-  await Print.printAsync({ html });
+  const fileUri = await createPdfFile(html);
+  await sharePdfFile(fileUri, options.labels.weeklyExportPdf);
 }

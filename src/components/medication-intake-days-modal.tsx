@@ -190,7 +190,13 @@ export function MedicationIntakeDaysModal({
   }
 
   return (
-    <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
+    <Modal
+      transparent
+      visible={visible}
+      animationType="fade"
+      presentationStyle="overFullScreen"
+      statusBarTranslucent
+      onRequestClose={onClose}>
       {visible ? (
         <MedicationIntakeDaysModalContent
           key={key}
@@ -209,6 +215,7 @@ const styles = StyleSheet.create({
   embeddedRoot: {
     ...StyleSheet.absoluteFill,
     zIndex: 20,
+    justifyContent: 'center',
   },
   overlay: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20 },
   card: { width: '100%', maxWidth: 420, borderRadius: 18, borderWidth: 1, paddingHorizontal: 20, paddingVertical: 18 },

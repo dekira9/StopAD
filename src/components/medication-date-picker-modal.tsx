@@ -26,20 +26,20 @@ import { formatMonthYear } from '@/utils/date-format';
 
 type Props = {
   visible: boolean;
+  /** Render inside a parent Modal (required on iOS — stacked Modals do not receive touches). */
+  embedded?: boolean;
   title: string;
   labels: AppLabels;
   locale: Locale;
   selectedDateKey?: string;
   minimumDateKey?: string;
-  allowNone?: boolean;
   onClose: () => void;
   onSelect: (dateKey: string) => void;
-  onSelectNone?: () => void;
 };
 
 const WEEK_STARTS_ON = 1 as const;
 
-type ContentProps = Omit<Props, 'visible'>;
+type ContentProps = Omit<Props, 'visible' | 'embedded'>;
 
 function MedicationDatePickerModalContent({
   title,
@@ -47,10 +47,8 @@ function MedicationDatePickerModalContent({
   locale,
   selectedDateKey,
   minimumDateKey,
-  allowNone,
   onClose,
   onSelect,
-  onSelectNone,
 }: ContentProps) {
   const { modal: theme } = useAppChromeTheme();
   const initialMonth = selectedDateKey
@@ -176,38 +174,47 @@ function MedicationDatePickerModalContent({
               );
             })}
           </View>
-
-          {allowNone ? (
-            <Pressable
-              onPress={() => {
-                onSelectNone?.();
-                onClose();
-              }}
-              style={({ pressed }) => [
-                styles.noneBtn,
-                { backgroundColor: theme.inactiveBg, borderColor: theme.inactiveBorder },
-                pressed && styles.pressed,
-              ]}>
-              <Text style={[styles.noneBtnText, { color: theme.inactiveText }]}>{labels.medicationScheduleNoEnd}</Text>
-            </Pressable>
-          ) : null}
         </Pressable>
       </Pressable>
   );
 }
 
-export function MedicationDatePickerModal({ visible, ...contentProps }: Props) {
+export function MedicationDatePickerModal({ visible, embedded = false, ...contentProps }: Props) {
   const key = contentProps.selectedDateKey ?? 'today';
+  if (!visible) return null;
+
+  const content = <MedicationDatePickerModalContent key={key} {...contentProps} />;
+
+  if (embedded) {
+    return <View style={styles.embeddedRoot}>{content}</View>;
+  }
 
   return (
-    <Modal transparent visible={visible} animationType="fade" onRequestClose={contentProps.onClose}>
-      {visible ? <MedicationDatePickerModalContent key={key} {...contentProps} /> : null}
+    <Modal
+      transparent
+      visible
+      animationType="fade"
+      presentationStyle="overFullScreen"
+      statusBarTranslucent
+      onRequestClose={contentProps.onClose}>
+      {content}
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20 },
+  embeddedRoot: {
+    ...StyleSheet.absoluteFill,
+    zIndex: 20,
+    justifyContent: 'center',
+  },
+  overlay: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 40,
+  },
   card: {
     width: '100%',
     maxWidth: 360,
@@ -274,13 +281,5 @@ const styles = StyleSheet.create({
   },
   dayCellDisabled: { opacity: 0.25 },
   dayText: { fontSize: 13, fontFamily: Fonts.mono },
-  noneBtn: {
-    marginTop: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  noneBtnText: { fontSize: 13, fontWeight: '600' },
   pressed: { opacity: 0.7 },
 });

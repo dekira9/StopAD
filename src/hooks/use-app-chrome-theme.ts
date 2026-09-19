@@ -7,7 +7,6 @@ import {
   type AppColorTheme,
   type ModalSurfaceTheme,
 } from '@/constants/app-chrome-theme';
-import { Colors } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 export type AppChromeThemeValue = {
@@ -20,7 +19,8 @@ export type AppChromeThemeValue = {
 /** Shared color chrome for diary UI + modals (one place instead of ad-hoc theme props). */
 export function useAppChromeTheme(): AppChromeThemeValue {
   const theme = useTheme();
-  const isDark = theme.background === Colors.dark.background;
+  // App is light-only: never derive this from the system color scheme.
+  const isDark = false;
 
   return useMemo(() => {
     const chrome = buildAppChromeTheme(theme, isDark);
