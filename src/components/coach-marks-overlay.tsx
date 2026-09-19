@@ -50,6 +50,8 @@ function SpotlightHole({ target, overlayColor }: { target: CoachMarkTarget; over
             left,
             width,
             height,
+            // Match circular footer buttons (36×36 with radius 18).
+            borderRadius: Math.max(width, height) / 2,
             borderColor: 'rgba(255,255,255,0.95)',
           },
         ]}
@@ -137,7 +139,6 @@ const styles = StyleSheet.create({
   highlightRing: {
     position: 'absolute',
     borderWidth: 2,
-    borderRadius: 16,
   },
   tooltip: {
     position: 'absolute',

@@ -239,6 +239,7 @@ function HomeScreen() {
   const [coachMarkStep, setCoachMarkStep] = useState<0 | 1>(0);
   const [panicCoachTarget, setPanicCoachTarget] = useState<CoachMarkTarget | null>(null);
   const [menuCoachTarget, setMenuCoachTarget] = useState<CoachMarkTarget | null>(null);
+  const screenRootRef = useRef<View>(null);
   const panicButtonRef = useRef<View>(null);
   const menuButtonRef = useRef<View>(null);
   const [medTimeTarget, setMedTimeTarget] = useState<{
@@ -271,15 +272,19 @@ function HomeScreen() {
     !showOnboarding;
 
   const measureCoachMarkTargets = useCallback(() => {
-    panicButtonRef.current?.measureInWindow((x, y, width, height) => {
-      if (width > 0 && height > 0) {
-        setPanicCoachTarget({ x, y, width, height });
-      }
-    });
-    menuButtonRef.current?.measureInWindow((x, y, width, height) => {
-      if (width > 0 && height > 0) {
-        setMenuCoachTarget({ x, y, width, height });
-      }
+    // Convert window coords into the screen root's local space so the spotlight
+    // aligns even when status bar / safe-area insets shift the content tree.
+    screenRootRef.current?.measureInWindow((originX, originY) => {
+      panicButtonRef.current?.measureInWindow((x, y, width, height) => {
+        if (width > 0 && height > 0) {
+          setPanicCoachTarget({ x: x - originX, y: y - originY, width, height });
+        }
+      });
+      menuButtonRef.current?.measureInWindow((x, y, width, height) => {
+        if (width > 0 && height > 0) {
+          setMenuCoachTarget({ x: x - originX, y: y - originY, width, height });
+        }
+      });
     });
   }, []);
 
@@ -291,6 +296,15 @@ function HomeScreen() {
     }, 180);
     return () => clearTimeout(timer);
   }, [showCoachMarks, measureCoachMarkTargets, footerHeight]);
+
+  // Re-show coach marks on every debug launch so spotlight alignment can be verified
+  // without clearing diary data. Production builds never hit this branch.
+  useEffect(() => {
+    if (!__DEV__) return;
+    if (!wellnessStore.hydrated || !wellnessStore.onboardingCompleted) return;
+    if (!wellnessStore.coachMarksSeen) return;
+    wellnessStore.coachMarksSeen = false;
+  }, [wellnessStore.hydrated, wellnessStore.onboardingCompleted]);
 
   const handleOnboardingComplete = useCallback(
     (result: OnboardingResult) => {
@@ -890,7 +904,10 @@ function HomeScreen() {
 
   return (
     <>
-      <View style={[styles.outer, { backgroundColor: theme.background }]}>
+      <View
+        ref={screenRootRef}
+        collapsable={false}
+        style={[styles.outer, { backgroundColor: theme.background }]}>
         <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
         <View style={[styles.cardWrapper, { maxWidth: MaxContentWidth }]}>
           <View style={[styles.card, styles.cardSurface, { backgroundColor: ui.contentBg, borderColor: ui.cardBorder }]}>
@@ -1987,22 +2004,22 @@ function HomeScreen() {
           </View>
         </View>
       </SafeAreaView>
-      </View>
 
-      {/* Sits at the screen root so spotlight coordinates match measureInWindow. */}
-      <CoachMarksOverlay
-        key={showCoachMarks ? 'coach-open' : 'coach-closed'}
-        visible={showCoachMarks}
-        step={coachMarkStep}
-        panicTarget={panicCoachTarget}
-        infoTarget={menuCoachTarget}
-        labels={t}
-        onNext={() => {
-          setCoachMarkStep(1);
-          setTimeout(measureCoachMarkTargets, 120);
-        }}
-        onDismiss={() => wellnessStore.dismissCoachMarks()}
-      />
+        {/* Inside the measured root so spotlight uses the same coordinate space. */}
+        <CoachMarksOverlay
+          key={showCoachMarks ? 'coach-open' : 'coach-closed'}
+          visible={showCoachMarks}
+          step={coachMarkStep}
+          panicTarget={panicCoachTarget}
+          infoTarget={menuCoachTarget}
+          labels={t}
+          onNext={() => {
+            setCoachMarkStep(1);
+            setTimeout(measureCoachMarkTargets, 120);
+          }}
+          onDismiss={() => wellnessStore.dismissCoachMarks()}
+        />
+      </View>
 
       {nightObservationDateKey ? (
         <SleepNightObservationOverlay
