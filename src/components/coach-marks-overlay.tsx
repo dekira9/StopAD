@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Dimensions, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect } from 'react';
+import { BackHandler, Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { FooterMenuDotsIcon } from '@/components/footer-bar-icons';
 import type { AppLabels } from '@/constants/i18n';
@@ -67,6 +68,16 @@ export function CoachMarksOverlay({
   onDismiss,
 }: Props) {
   const { modal: theme } = useAppChromeTheme();
+
+  useEffect(() => {
+    if (!visible) return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      onDismiss();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [visible, onDismiss]);
+
   const target = step === 0 ? panicTarget : infoTarget;
   const title = step === 0 ? labels.coachMarkPanicTitle : labels.coachMarkInfoTitle;
   const body = step === 0 ? labels.coachMarkPanicBody : labels.coachMarkInfoBody;
@@ -78,45 +89,50 @@ export function CoachMarksOverlay({
   const tooltipTop = tooltipAbove ? Math.max(24, target.y - PADDING - 168) : target.y + target.height + PADDING + 12;
 
   return (
-    <Modal transparent visible animationType="fade" onRequestClose={onDismiss}>
-      <View style={styles.root}>
-        <SpotlightHole target={target} overlayColor={theme.modalOverlay} />
+    <View style={styles.root}>
+      {/* Swallows taps anywhere outside the tooltip, including the spotlight hole. */}
+      <Pressable style={StyleSheet.absoluteFill} onPress={() => {}} />
 
-        <View
-          style={[
-            styles.tooltip,
-            {
-              top: tooltipTop,
-              backgroundColor: theme.modalBg,
-              borderColor: theme.subtlePanelBorder,
-            },
-          ]}>
-          <View style={styles.tooltipHeader}>
-            {step === 0 ? (
-              <Ionicons name="pulse" size={18} color={theme.activeBg} />
-            ) : (
-              <FooterMenuDotsIcon size={18} color={theme.icon} />
-            )}
-            <Text style={[styles.tooltipTitle, { color: theme.text }]}>{title}</Text>
-          </View>
-          <Text style={[styles.tooltipBody, { color: theme.textSecondary }]}>{body}</Text>
-          <Pressable
-            onPress={step === 0 ? onNext : onDismiss}
-            style={({ pressed }) => [
-              styles.actionButton,
-              { backgroundColor: theme.activeBg, borderColor: theme.activeBg },
-              pressed && styles.pressed,
-            ]}>
-            <Text style={[styles.actionButtonText, { color: theme.activeText }]}>{actionLabel}</Text>
-          </Pressable>
+      <SpotlightHole target={target} overlayColor={theme.modalOverlay} />
+
+      <View
+        style={[
+          styles.tooltip,
+          {
+            top: tooltipTop,
+            backgroundColor: theme.modalBg,
+            borderColor: theme.subtlePanelBorder,
+          },
+        ]}>
+        <View style={styles.tooltipHeader}>
+          {step === 0 ? (
+            <Ionicons name="pulse" size={18} color={theme.activeBg} />
+          ) : (
+            <FooterMenuDotsIcon size={18} color={theme.icon} />
+          )}
+          <Text style={[styles.tooltipTitle, { color: theme.text }]}>{title}</Text>
         </View>
+        <Text style={[styles.tooltipBody, { color: theme.textSecondary }]}>{body}</Text>
+        <Pressable
+          onPress={step === 0 ? onNext : onDismiss}
+          style={({ pressed }) => [
+            styles.actionButton,
+            { backgroundColor: theme.activeBg, borderColor: theme.activeBg },
+            pressed && styles.pressed,
+          ]}>
+          <Text style={[styles.actionButtonText, { color: theme.activeText }]}>{actionLabel}</Text>
+        </Pressable>
       </View>
-    </Modal>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
+  root: {
+    ...StyleSheet.absoluteFill,
+    zIndex: 900,
+    elevation: 900,
+  },
   shade: { position: 'absolute' },
   highlightRing: {
     position: 'absolute',

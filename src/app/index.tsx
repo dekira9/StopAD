@@ -1633,20 +1633,6 @@ function HomeScreen() {
               onComplete={handleOnboardingComplete}
             />
 
-            <CoachMarksOverlay
-              key={showCoachMarks ? 'coach-open' : 'coach-closed'}
-              visible={showCoachMarks}
-              step={coachMarkStep}
-              panicTarget={panicCoachTarget}
-              infoTarget={menuCoachTarget}
-              labels={t}
-              onNext={() => {
-                setCoachMarkStep(1);
-                setTimeout(measureCoachMarkTargets, 120);
-              }}
-              onDismiss={() => wellnessStore.dismissCoachMarks()}
-            />
-
             <PanicAttackModal
               visible={showPanicAttack}
               labels={t}
@@ -2002,6 +1988,22 @@ function HomeScreen() {
         </View>
       </SafeAreaView>
       </View>
+
+      {/* Sits at the screen root so spotlight coordinates match measureInWindow. */}
+      <CoachMarksOverlay
+        key={showCoachMarks ? 'coach-open' : 'coach-closed'}
+        visible={showCoachMarks}
+        step={coachMarkStep}
+        panicTarget={panicCoachTarget}
+        infoTarget={menuCoachTarget}
+        labels={t}
+        onNext={() => {
+          setCoachMarkStep(1);
+          setTimeout(measureCoachMarkTargets, 120);
+        }}
+        onDismiss={() => wellnessStore.dismissCoachMarks()}
+      />
+
       {nightObservationDateKey ? (
         <SleepNightObservationOverlay
           labels={t}
