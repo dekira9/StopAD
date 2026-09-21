@@ -24,7 +24,7 @@
       },
       "backgroundColor": "#F5F6FA",
       "predictiveBackGestureEnabled": false,
-      "package": "com.ilyadylko.HiAnxiety",
+      "package": "com.hianxiety",
       "blockedPermissions": [
         "android.permission.RECORD_AUDIO"
       ]
