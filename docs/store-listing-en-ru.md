@@ -125,7 +125,7 @@ Charts and a week overview on Sunday. Export a PDF to share with your doctor or 
 No account. No ads. No server upload. Your diary stays on your phone or tablet.
 
 ✦ 10 LANGUAGES
-English, Russian, Spanish, French, German, Chinese, Portuguese, Italian, Japanese, Korean.
+English, Chinese, French, German, Italian, Japanese, Korean, Portuguese, Russian, Spanish.
 
 IMPORTANT: Hi, Anxiety is a personal diary. It does not provide medical advice, diagnosis, treatment, or emergency services. If you are in crisis, seek professional help immediately.
 
